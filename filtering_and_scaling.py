@@ -1,8 +1,8 @@
-import utils
+from utils import collapse_columns_by_string, filter_by_suffix
 
 def initial_processing_of_TCGA_mirna_counts_pipeline_1(df, samples_to_keep):
-    collapsed = utils.collapse_columns_by_string(df)
-    filtered = utils.filter_by_suffix(
+    collapsed = collapse_columns_by_string(df)
+    filtered = filter_by_suffix(
         collapsed,
         suffix_to_not_include=('unannotated', 'precursor', 'stemloop')
     )
