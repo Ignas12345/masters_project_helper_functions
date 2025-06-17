@@ -102,8 +102,8 @@ def plot_single_feature(df, feature, samples_to_use:list|None = None, noise_leve
     y_min = min(x_data)/2
     y_max = max(x_data)/2
     y_diff = y_max - y_min
-    y_min = y_min - y_diff
-    y_max = y_max - y_diff
+    y_min = y_min - y_diff/2
+    y_max = y_max - y_diff/2
     ylim = [y_min, y_max]
 
   plt.figure()
