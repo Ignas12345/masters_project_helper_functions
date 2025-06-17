@@ -142,3 +142,96 @@ def plot_single_feature(df, feature, samples_to_use:list|None = None, noise_leve
     else:
       plt.savefig(f'{feature}.png')
   plt.show()
+
+def plot_two_features(df_1, feature_1, feature_2, df_2 = None, samples_to_use:list|None = None, sample_ordering:list|None = None,
+                                  sample_label_dict : dict = None, label_color_dict = None, samples_to_higlight: list|None = None,
+                                  xlim = None, ylim = None, show_legend = True, title = None, slice_for_samples:slice = None, use_numbers:bool = None, save_plot=False):
+  '''
+  Paima df, kuriu rows yra observazijos ir padaro dvieju bruozu plot'a.
+  label_dict turėtų turėti sample_ids kaip raktus ir etiketes kaip values
+  slice_for_samples, use_numbers argumentai yra naudojami kitame funckijos variante - ten kur su tekstu plotinna - cia jie nereikalingi
+  Parameters:
+  - df_1: DataFrame with features as columns and samples as rows
+  - feature_1: name of the first feature to plot
+  - feature_2: name of the second feature to plot
+  - df_2: DataFrame with features as columns and samples as rows (optional, if not provided, df_1 will be used)
+  - samples_to_use: list of samples to use for plotting (optional, if not provided, all samples will be used)
+  - sample_ordering: list of samples to use for ordering (optional, if not provided, samples will be used in the order they appear in the DataFrame)
+  - sample_label_dict: dictionary with sample ids as keys and labels as values (optional, if not provided, all samples will be labeled as 'sample')
+  - label_color_dict: dictionary with labels as keys and colors as values (optional, if not provided, default colors will be used)
+  - samples_to_higlight: list of samples to highlight in the plot (optional, if not provided, no samples will be highlighted)
+  - xlim: limits for the x-axis (optional)
+  - ylim: limits for the y-axis (optional)
+  - show_legend: whether to show the legend (default: True)
+  - title: title of the plot (optional)
+  - slice_for_samples: slice to apply to sample names (optional, not used in this function)
+  - use_numbers: whether to use sample numbers instead of names (optional, not used in this function)
+  - save_plot: whether to save the plot as a PNG file (default: False)
+  '''
+  df_1 = df_1.copy()
+  if df_2 is None:
+    df_2 = df_1.copy()
+  else:
+    df_2 = df_2.copy()
+
+  if samples_to_use is None:
+    samples_to_use = df_1.index.copy()
+    use_all_samples = True
+  else:
+    use_all_samples = False
+
+  if sample_label_dict is None:
+    sample_label_dict = {}
+    for sample in samples_to_use:
+      sample_label_dict[sample] = 'sample'
+  label_sample_dict = invert_label_dict(sample_label_dict, original_keys='samples')
+
+  if use_all_samples == False:
+    samples_to_use = prepare_sample_list(elements = samples_to_use, sample_names = df_1.index.copy(), label_sample_dict = label_sample_dict, sample_ordering = sample_ordering)
+
+  if label_color_dict is None:
+    label_color_dict = create_label_colors(sample_label_dict)
+  labels_initial = list(label_color_dict.keys())
+  labels = [label for label in labels_initial if label in label_sample_dict.keys()]
+
+  x_data = df_1[feature_1]
+  y_data = df_2[feature_2]
+
+  plt.figure()
+
+  if use_all_samples:
+    for label in labels:
+      samples_with_label = label_sample_dict[label]
+      #plt.scatter(x_data[samples_with_label], y_data[samples_with_label], label = label, c = label_color_dict[label])
+      plt.scatter(x_data.loc[samples_with_label], y_data.loc[samples_with_label], label = label, c = label_color_dict[label])
+  else:
+    for label in labels:
+      samples_with_label = list(set(label_sample_dict[label]).intersection(set(samples_to_use)))
+      if len(samples_with_label) > 0:
+        #plt.scatter(x_data[samples_with_label], y_data[samples_with_label], label = label, c = label_color_dict[label])
+        plt.scatter(x_data.loc[samples_with_label], y_data.loc[samples_with_label], label = label, c = label_color_dict[label])
+
+  if samples_to_higlight is not None:
+    samples_to_higlight = prepare_sample_list(elements = samples_to_higlight, sample_names = samples_to_use, label_sample_dict = label_sample_dict, sample_ordering = sample_ordering)
+    plt.scatter(x_data.loc[samples_to_higlight], y_data.loc[samples_to_higlight], label = 'highlighted', c = 'gold', marker='v')
+
+
+
+  if show_legend:
+    plt.legend()
+  plt.xlabel(feature_1)
+  plt.ylabel(feature_2)
+  if xlim is not None:
+    plt.xlim(xlim)
+  if ylim is not None:
+    plt.ylim(ylim)
+  if title is not None:
+    plt.title(title)
+  if save_plot:
+    if title is not None:
+      plt.savefig(f'{title}.png')
+    else:
+      plt.savefig(f'{feature_1}_{feature_2}.png')
+  plt.show()
+
+  

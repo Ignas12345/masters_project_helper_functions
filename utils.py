@@ -40,3 +40,45 @@ def filter_by_suffix(df, suffix_to_not_include = None, suffix_to_keep = None):
     df = df.loc[:, df.columns.str.endswith(suffix_to_keep)]
   print('shape after filtering: ' + str(df.shape))
   return df
+
+def format_data_frame(df:str|pd.DataFrame, sep = ',', decimal = '.', index_col = 0, columns_slice = slice(15), transpose = False, fill_nan_with_0 = True):
+  '''
+  Function to format a DataFrame.
+  Parameters:
+  - df: DataFrame or URL to a CSV file
+  - sep: separator for CSV file
+  - decimal: decimal separator for CSV file
+  - index_col: column to use as index
+  - columns_slice: slice to apply to column names
+  - transpose: whether to transpose the DataFrame
+  - fill_nan_with_0: whether to fill NaN values with 0
+  Returns:
+  - formatted DataFrame
+  '''
+  message = ''
+
+  if type(df) == str:
+    print('reading df from url: ' + df)
+    df = pd.read_csv(df, sep = sep, decimal = decimal, index_col = index_col)
+  else:
+    df = df.copy()
+
+  #check if there are nan values
+  if df.isna().any().any() and fill_nan_with_0:
+      df.fillna(0, inplace = True)
+      
+      print('nan values filled with 0')
+
+
+  if columns_slice is not None:
+    df.columns = [col[columns_slice] for col in df.head().columns]
+    print('column names truncated using: ' + str(columns_slice))
+
+
+  if transpose:
+    df = df.T.copy()
+    print('df transposed')
+
+  print('final shape of df: ' + str(df.shape) + '\n')
+
+  return df
