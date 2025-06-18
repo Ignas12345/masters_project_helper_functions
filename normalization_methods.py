@@ -1,7 +1,7 @@
 def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1):
     """
     Written by ChatGPT
-    Normalize miRNA expression data by housekeeping gene(s).
+    Sample-wise scaling. Normalize miRNA expression data by housekeeping gene(s).
     Assumes:
     - Rows = samples
     - Columns = miRNAs
