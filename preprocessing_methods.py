@@ -1,3 +1,6 @@
+import pandas as pd
+import numpy as np
+
 def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1):
     """
     Written by ChatGPT
@@ -71,3 +74,47 @@ def keep_top_n_features_by_mean(df, n):
     top_n_columns = col_means.nlargest(n).index
 
     return top_n_columns
+
+'''Below are feature-wise scaling methods, such as z-normalization, log-transformation'''
+
+def identity_normalization(df):
+    return df
+
+def log_normalization(df, mean_center = True):
+    norm_data =  np.log2(df + 1)
+    if mean_center:
+        return norm_data - norm_data.mean()
+    else:
+        return norm_data
+
+def log_normalization_followed_by_z_normalization(df):
+    return z_normalization(log_normalization(df))
+
+def log_normalization_followed_by_modified_z_normalization(df):
+    original_mean = df.mean()
+    return z_normalization(log_normalization(df)) * np.log(original_mean + 1)
+
+def z_normalization(df, use_std = True):
+  if use_std:
+    return (df - df.mean()) / (df.std() + 1e-6)
+  else:
+    return (df - df.mean())
+
+def modified_z_normalization(df):
+  '''
+  Same as Z-normalization, but features on bigger scales get more importance
+  '''
+  return ((df - df.mean()) / (df.std() + 1e-6)) * np.log(df.mean() + 1)
+
+def prepare_normalization_methods():
+    """
+    Prepares a dictionary of normalization methods for easy access.
+    """
+    return {
+        'identity': identity_normalization,
+        'z_normalization': z_normalization,
+        'modified_z_normalization': modified_z_normalization,
+        'log_normalization': log_normalization,
+        'log_normalization_followed_by_z_normalization': log_normalization_followed_by_z_normalization,
+        'log_normalization_followed_by_modified_z_normalization': log_normalization_followed_by_modified_z_normalization
+    }
