@@ -29,7 +29,7 @@ def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1):
     else:
         reference = hk_expr.iloc[:, 0]
 
-    normalized_df = df.div(reference * factor, axis=0)
+    normalized_df = df.div(reference / factor, axis=0)
 
     return normalized_df
 
@@ -75,43 +75,56 @@ def keep_top_n_features_by_mean(df, n):
 
     return top_n_columns
 
-'''Below are feature-wise scaling methods, such as z-normalization, log-transformation'''
+'''Below are feature-wise scaling methods, such as z-normalization, log-transformation. All assume that rows are samples and columns are features.'''
 
-def identity_normalization(df):
+def identity_normalization(df, mean = None, mean_of_logs = None, std = None):
     return df
 
-def log_normalization(df, mean_center = True):
+def log_normalization(df, mean_center = True, mean = None, mean_of_logs = None, std = None):
     norm_data =  np.log2(df + 1)
     if mean_center:
-        return norm_data - norm_data.mean()
+        if mean_of_logs is None:
+            mean_of_logs = norm_data.mean()
+        return norm_data - mean_of_logs
     else:
         return norm_data
 
-def log_normalization_followed_by_z_normalization(df):
-    return z_normalization(log_normalization(df))
+def log_normalization_followed_by_z_normalization(df, mean = None, mean_of_logs = None, std = None):
+    return z_normalization(log_normalization(df, mean = mean, mean_of_logs = mean_of_logs, std = std), use_std = True, mean = mean, std = std) 
 
-def log_normalization_followed_by_modified_z_normalization(df):
-    original_mean = df.mean()
-    return z_normalization(log_normalization(df)) * np.log(original_mean + 1)
+def log_normalization_followed_by_modified_z_normalization(df, mean = None, mean_of_logs = None, std = None):
+    if mean is None:
+        mean = df.mean()
+    return z_normalization(log_normalization(df, mean = mean, mean_of_logs = mean_of_logs, std = std), use_std = True, mean = mean, std = std) * np.log(mean + 1)
 
-def z_normalization(df, use_std = True):
-  if use_std:
-    return (df - df.mean()) / (df.std() + 1e-6)
-  else:
-    return (df - df.mean())
+def z_normalization(df, use_std = True, mean = None, mean_of_logs = None, std = None):
+    if use_std:
+        if mean is None:
+            mean = df.mean()
+        if std is None:
+            std = df.std() + 1e-6
+        return (df - mean) / std
+    else:
+        if mean is None:
+            mean = df.mean()
+        return (df - mean)
 
-def modified_z_normalization(df):
-  '''
-  Same as Z-normalization, but features on bigger scales get more importance
-  '''
-  return ((df - df.mean()) / (df.std() + 1e-6)) * np.log(df.mean() + 1)
+def modified_z_normalization(df, mean = None, mean_of_logs = None, std = None):
+    '''
+    Same as Z-normalization, but features on bigger scales get more importance
+    '''
+    if mean is None:
+        mean = df.mean()
+    if std is None:
+        std = df.std() + 1e-6
+    return ((df - mean) / std) * np.log(mean + 1)
 
 def prepare_normalization_methods():
     """
     Prepares a dictionary of normalization methods for easy access.
     """
     return {
-        'identity': identity_normalization,
+        'identity_normalization': identity_normalization,
         'z_normalization': z_normalization,
         'modified_z_normalization': modified_z_normalization,
         'log_normalization': log_normalization,
