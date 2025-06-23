@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1):
+def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, **kwargs):
     """
     Written by ChatGPT
     Sample-wise scaling. Normalize miRNA expression data by housekeeping gene(s).
@@ -33,7 +33,7 @@ def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1):
 
     return normalized_df
 
-def feature_filtering_by_class_means(df_to_use, class1_samples, class2_samples, class1_name = '1', class2_name = '2', threshold_to_keep = 45):
+def feature_filtering_by_class_means(df_to_use, class1_samples, class2_samples, class1_name = '1', class2_name = '2', threshold_to_keep = 45, **kwargs):
     '''paprasta funkcija, kuri atlieka bruozu filtravima pagal meginius ir ju klases. (should be used with rpm data) - thereshold_to_keep = 50 buvo paimta iš TCGA tyrimo'''
     # Extract expression data for the two classs
     data1 = df_to_use.loc[class1_samples].copy()
@@ -50,7 +50,7 @@ def feature_filtering_by_class_means(df_to_use, class1_samples, class2_samples, 
 
     return features_to_keep
 
-def filter_low_expression_features_on_raw_counts(data, min_count=5, min_observations=3):
+def filter_low_expression_features_on_raw_counts(data, min_count=5, min_observations=3, **kwargs):
     """
     Filters out features (columns) that are weakly expressed across observations (should be used with raw counts data).
 
@@ -68,7 +68,7 @@ def filter_low_expression_features_on_raw_counts(data, min_count=5, min_observat
     print('Number of features kept: ' + str(keep_features.sum()))
     return keep_features[keep_features].index
 
-def keep_top_n_features_by_mean(df, n):
+def keep_top_n_features_by_mean(df, n, **kwargs):
 
     col_means = df.mean()
     top_n_columns = col_means.nlargest(n).index
@@ -77,47 +77,47 @@ def keep_top_n_features_by_mean(df, n):
 
 '''Below are feature-wise scaling methods, such as z-normalization, log-transformation. All assume that rows are samples and columns are features.'''
 
-def identity_normalization(df, mean = None, mean_of_logs = None, std = None):
+def identity_normalization(df, **kwargs):
     return df
 
-def log_normalization(df, mean_center = True, mean = None, mean_of_logs = None, std = None):
+def log_normalization(df, mean_center = True, means_of_logs = None, **kwargs):
     norm_data =  np.log2(df + 1)
     if mean_center:
-        if mean_of_logs is None:
-            mean_of_logs = norm_data.mean()
-        return norm_data - mean_of_logs
+        if means_of_logs is None:
+            means_of_logs = norm_data.mean()
+        return norm_data - means_of_logs
     else:
         return norm_data
 
-def log_normalization_followed_by_z_normalization(df, mean = None, mean_of_logs = None, std = None):
-    return z_normalization(log_normalization(df, mean = mean, mean_of_logs = mean_of_logs, std = std), use_std = True, mean = mean, std = std) 
+def log_normalization_followed_by_z_normalization(df, means = None, means_of_logs = None, stds = None, **kwargs):
+    return z_normalization(log_normalization(df, means = means, means_of_logs = means_of_logs, stds = stds), use_std = True, means = means, stds = stds) 
 
-def log_normalization_followed_by_modified_z_normalization(df, mean = None, mean_of_logs = None, std = None):
-    if mean is None:
-        mean = df.mean()
-    return z_normalization(log_normalization(df, mean = mean, mean_of_logs = mean_of_logs, std = std), use_std = True, mean = mean, std = std) * np.log(mean + 1)
+def log_normalization_followed_by_modified_z_normalization(df, means = None, means_of_logs = None, stds = None, **kwargs):
+    if means is None:
+        means = df.mean()
+    return z_normalization(log_normalization(df, means = means, means_of_logs = means_of_logs, stds = stds), use_std = True, means = means, stds = stds) * np.log(means + 1)
 
-def z_normalization(df, use_std = True, mean = None, mean_of_logs = None, std = None):
+def z_normalization(df, use_std = True, means = None, stds = None, **kwargs):
     if use_std:
-        if mean is None:
-            mean = df.mean()
-        if std is None:
-            std = df.std() + 1e-6
-        return (df - mean) / std
+        if means is None:
+            means = df.mean()
+        if stds is None:
+            stds = df.std()
+        return (df - means) / (stds + 1e-6)
     else:
-        if mean is None:
-            mean = df.mean()
-        return (df - mean)
+        if means is None:
+            means = df.mean()
+        return (df - means)
 
-def modified_z_normalization(df, mean = None, mean_of_logs = None, std = None):
+def modified_z_normalization(df, means = None, stds = None, **kwargs):
     '''
     Same as Z-normalization, but features on bigger scales get more importance
     '''
-    if mean is None:
-        mean = df.mean()
-    if std is None:
-        std = df.std() + 1e-6
-    return ((df - mean) / std) * np.log(mean + 1)
+    if means is None:
+        means = df.mean()
+    if stds is None:
+        stds = df.std() 
+    return ((df - means) / (stds + 1e-6)) * np.log(means + 1)
 
 def prepare_normalization_methods():
     """
