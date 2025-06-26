@@ -57,6 +57,10 @@ def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, scal
             raise ValueError("mode must be either 'train' or 'test'")
 
     normalized_df = df.div(reference / factor, axis=0)
+    #remove genes that have std = 0 after normalization (likely housekeeping gene if only one was used)
+    std_values = normalized_df.std(axis=0)
+    normalized_df = normalized_df.loc[:, std_values > 0]
+
     if mode == 'train':
         return normalized_df, train_params
     elif mode == 'test':

@@ -360,10 +360,10 @@ def loo_cv(X_cv, y_cv, final_classifier, label_dict = None, seed = 42):
 
   return results_df
 
-def perform_DE_test(df_to_use, group1_samples, group2_samples):
+def perform_DE_test(df_to_use, class1_samples,  class2_samples):
     # Extract expression data for the two groups
-    data1 = df_to_use.loc[group1_samples].copy()
-    data2 = df_to_use.loc[group2_samples].copy()
+    data1 = df_to_use.loc[class1_samples].copy()
+    data2 = df_to_use.loc[class2_samples].copy()
 
     # Perform unpaired t-test
     p_vals = []
@@ -408,3 +408,43 @@ def get_top_DE_features(DE_results, n_features_to_return = 17, return_separately
   if return_separately:
     return top_up, top_down
   return top_features
+
+#below are defined functions for feature ranking
+
+def perform_DE_ranking(df_to_use, mode = "test", class1_samples = None, class2_samples = None,  ignore_p_value=False):
+    if mode == "train":
+        if class1_samples is None or class2_samples is None:
+            raise ValueError("For training mode, class1_samples and class2_samples must be provided.")
+        # Extract expression data for the two groups
+        data1 = df_to_use.loc[class1_samples].copy()
+        data2 = df_to_use.loc[class2_samples].copy()
+
+        # Perform unpaired t-test
+        p_vals = []
+        fold_changes = []
+        for feature in df_to_use.columns:
+            vals1 = data1[feature].values.astype(float)
+            vals2 = data2[feature].values.astype(float)
+            t_stat, p = ttest_ind(vals1, vals2, equal_var=False)
+            p_vals.append(p)
+
+            fc = np.median(vals1 + 1) / np.median(vals2 + 1)
+            if fc < 1:
+                fc =  - 1 / fc
+            # Median-based fold change
+            fold_changes.append(fc)
+
+        # FDR correction
+        reject, p_adj = fdrcorrection(p_vals, alpha=0.05)
+        results = pd.DataFrame({
+            'feature': df_to_use.columns,
+            'Fold Change': fold_changes,
+            'abs_Fold Change': np.abs(fold_changes),
+            'pval': p_vals,
+            'fdr': p_adj,
+            'significant': reject
+        })
+        #now sort features firstly significantly, then by absolute fold change
+        results = results.sort_values(by=['significant', 'abs_Fold Change'], ascending=[False, False])
+        #return only the 'feature' column in order of significance
+        return results['feature'].tolist()
