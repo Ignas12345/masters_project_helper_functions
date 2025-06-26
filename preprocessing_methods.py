@@ -13,7 +13,7 @@ def identity(df, mode = 'test'):
 
 #below is the definition of our only sample_wise normalization method - normalization by a housekeeping gene or a list of such genes.
 
-def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, scale_by_houskeep_mean = False, mode = 'test', houskeep_mean = None):
+def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, scale_by_housekeep_mean = False, mode = 'test', housekeep_mean = None):
     """
     Written by ChatGPT
     Sample-wise scaling. Normalize miRNA expression df by housekeeping gene(s).
@@ -44,15 +44,15 @@ def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, scal
     else:
         reference = hk_expr.iloc[:, 0]
 
-    if scale_by_houskeep_mean:
+    if scale_by_housekeep_mean:
         if mode == 'train':
             # Scale by mean of housekeeping genes; factor is ignored in this case
             factor = reference.mean()
-            train_params['houskeep_mean'] = factor
+            train_params['housekeep_mean'] = factor
         elif mode == 'test':
-            if houskeep_mean is None:
-                raise ValueError("houskeep_mean must be provided in test mode when scale_by_houskeep_mean is True")
-            factor = houskeep_mean
+            if housekeep_mean is None:
+                raise ValueError("housekeep_mean must be provided in test mode when scale_by_housekeep_mean is True")
+            factor = housekeep_mean
         else:
             raise ValueError("mode must be either 'train' or 'test'")
 
