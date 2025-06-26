@@ -1,5 +1,9 @@
 import pandas as pd
 import numpy as np
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression
+from scipy.stats import ttest_ind
+from statsmodels.stats.multitest import fdrcorrection
 
 #definition of identity transformation, which is used when no transformation is needed.
 def identity(df, mode = 'test', **kwargs):
@@ -57,9 +61,6 @@ def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, scal
             raise ValueError("mode must be either 'train' or 'test'")
 
     normalized_df = df.div(reference / factor, axis=0)
-    #remove genes that have std = 0 after normalization (likely housekeeping gene if only one was used)
-    std_values = normalized_df.std(axis=0)
-    normalized_df = normalized_df.loc[:, std_values > 0]
 
     if mode == 'train':
         return normalized_df, train_params
@@ -244,3 +245,111 @@ def prepare_normalization_methods():
         'log_normalization': log_normalization,
         'log_normalization_followed_by_z_normalization': log_normalization_followed_by_z_normalization,
     }
+
+#Below are some feature ranking methods and a method for feature filtering with respect to some feature ranking):
+def perform_DE_ranking(df_to_use, class1_samples = None, class2_samples = None,  ignore_p_value=False, **kwargs):
+        if class1_samples is None or class2_samples is None:
+            raise ValueError("For training mode, class1_samples and class2_samples must be provided.")
+        # Extract expression data for the two groups
+        data1 = df_to_use.loc[class1_samples].copy()
+        data2 = df_to_use.loc[class2_samples].copy()
+
+        # Perform unpaired t-test
+        p_vals = []
+        fold_changes = []
+        for feature in df_to_use.columns:
+            vals1 = data1[feature].values.astype(float)
+            vals2 = data2[feature].values.astype(float)
+            t_stat, p = ttest_ind(vals1, vals2, equal_var=False)
+            p_vals.append(p)
+
+            fc = np.median(vals1 + 1) / np.median(vals2 + 1)
+            if fc < 1:
+                fc =  - 1 / fc
+            # Median-based fold change
+            fold_changes.append(fc)
+
+        # FDR correction
+        reject, p_adj = fdrcorrection(p_vals, alpha=0.05)
+        print(p_adj)
+        results = pd.DataFrame({
+            'feature': df_to_use.columns,
+            'Fold Change': fold_changes,
+            'abs_Fold Change': np.abs(fold_changes),
+            'pval': p_vals,
+            'fdr': p_adj,
+            'significant': reject
+        })
+        #now sort features firstly significantly, then by absolute fold change
+        if ignore_p_value:
+            results['significant'] = True
+        results = results.sort_values(by=['significant', 'abs_Fold Change'], ascending=[False, False])
+        #return only the 'feature' column in order of significance
+
+        return results['feature'].tolist()
+
+def perform_rfe_ranking(df_to_use, class1_samples , class2_samples, estimator_for_rfe_ranking = LogisticRegression(), step_size_for_rfe_ranking = 1, **kwargs):
+    y = np.array([1] * len(class1_samples) + [0] * len(class2_samples))
+    X = df_to_use.loc[class1_samples + class2_samples].copy()
+    # Ensure the estimator is fitted on the combined data
+    rfe = RFE(estimator=estimator_for_rfe_ranking, n_features_to_select=1, step=step_size_for_rfe_ranking)
+    print('Performing RFE ranking with estimator: ', estimator_for_rfe_ranking.__class__.__name__)
+    rfe.fit(X, y)
+    # Get the ranking of features
+    ranking = rfe.ranking_
+    # return the features as a list sorted by their ranking:
+    ranked_features = pd.Series(ranking, index=X.columns).sort_values()
+    return ranked_features.index.tolist()
+
+    
+
+def rank_features_and_keep_top_n_features(X, class1_samples, class2_samples,  feature_ranking_method, n = 100, drop_correlated_features = False, spearman_corr_threshold = 0.9, mode = 'test', features_to_keep = None, **kwargs):
+    """
+    Rank features based on a specified feature selection method and keep the top N features.
+    
+    Parameters:
+    - X: DataFrame with rows as samples and columns as features.
+    - class1_samples: List of sample indices for class 1.
+    - class2_samples: List of sample indices for class 2.
+    - n: Number of top features to keep.
+    - feature_ranking_method: Function to rank features (e.g., ANOVA, t-test).
+    - drop_correlated_features: Whether to drop highly correlated features.
+    - spearman_corr_threshold: Correlation threshold for dropping features.
+    - mode: 'train' or 'test'.
+    - features_to_keep: List of features to keep (required in 'test' mode).
+    
+    Returns:
+    - In 'train' mode: Tuple (DataFrame with top N ranked features, train_params dictionary).
+    - In 'test' mode: DataFrame with top N ranked features.
+    """
+    if mode == 'train':
+        train_params = {}
+        # Rank features using the specified method
+        print('Ranking features using method: ', feature_ranking_method.__name__)
+        ranked_features = feature_ranking_method(X, class1_samples, class2_samples, **kwargs)
+        
+        if drop_correlated_features:
+            # Drop highly correlated features
+            corr_matrix = X[ranked_features].corr(method='spearman')
+            selected = []
+            for feat in ranked_features:
+                # if feat is correlated above threshold with any already selected, skip it
+                if any(corr_matrix.loc[feat, kept] > spearman_corr_threshold for kept in selected):
+                    continue
+                selected.append(feat)
+            ranked_features = selected
+        # Keep only the top N features
+        if n is None or n > len(ranked_features):
+            n = len(ranked_features)
+        ranked_features = ranked_features[:n]
+
+        train_params['features_to_keep'] = ranked_features
+        return X[ranked_features].copy(), train_params
+
+    elif mode == 'test':
+        if features_to_keep is None:
+            raise ValueError("features_to_keep must be provided in test mode")
+        return X[features_to_keep].copy()
+    
+    else:
+        raise ValueError("mode must be either 'train' or 'test'")
