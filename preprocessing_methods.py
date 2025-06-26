@@ -64,10 +64,12 @@ def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, scal
 
 # Below are feature filtering methods, such as filtering by class means, filtering by low expression, and keeping top N features.
 
-def feature_filtering_by_class_means(df, class1_samples, class2_samples, class1_name = '1', class2_name = '2', filtering_by_class_means_threshold_to_keep = 45, mode = 'test', filtering_by_class_means_features_to_keep = None, **kwargs):
+def feature_filtering_by_class_means(df, class1_samples = None, class2_samples = None, class1_name = '1', class2_name = '2', filtering_by_class_means_threshold_to_keep = 45, mode = 'test', filtering_by_class_means_features_to_keep = None, **kwargs):
     '''paprasta funkcija, kuri atlieka bruozu filtravima pagal meginius ir ju klases. (should be used with rpm df) - thereshold_to_keep = 50 buvo paimta iš TCGA tyrimo'''
     if mode == 'train':
         train_params = {}
+        if class1_samples is None or class2_samples is None:
+            raise ValueError("class1_samples and class2_samples must be provided in train mode")
         # Extract expression df for the two classs
         data1 = df.loc[class1_samples].copy()
         data2 = df.loc[class2_samples].copy()
