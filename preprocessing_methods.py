@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 #definition of identity transformation, which is used when no transformation is needed.
-def identity(df, mode = 'test'):
+def identity(df, mode = 'test', **kwargs):
     if mode == 'train':
         train_params = {}
         return df.copy(), train_params
@@ -13,7 +13,7 @@ def identity(df, mode = 'test'):
 
 #below is the definition of our only sample_wise normalization method - normalization by a housekeeping gene or a list of such genes.
 
-def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, scale_by_housekeep_mean = False, mode = 'test', housekeep_mean = None):
+def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, scale_by_housekeep_mean = False, mode = 'test', housekeep_mean = None, **kwargs):
     """
     Written by ChatGPT
     Sample-wise scaling. Normalize miRNA expression df by housekeeping gene(s).
@@ -64,7 +64,7 @@ def normalize_by_housekeeping_list(df, housekeeping_list: list, factor = 1, scal
 
 # Below are feature filtering methods, such as filtering by class means, filtering by low expression, and keeping top N features.
 
-def feature_filtering_by_class_means(df, class1_samples, class2_samples, class1_name = '1', class2_name = '2', filtering_by_class_means_threshold_to_keep = 45, mode = 'test', filtering_by_class_means_features_to_keep = None):
+def feature_filtering_by_class_means(df, class1_samples, class2_samples, class1_name = '1', class2_name = '2', filtering_by_class_means_threshold_to_keep = 45, mode = 'test', filtering_by_class_means_features_to_keep = None, **kwargs):
     '''paprasta funkcija, kuri atlieka bruozu filtravima pagal meginius ir ju klases. (should be used with rpm df) - thereshold_to_keep = 50 buvo paimta iš TCGA tyrimo'''
     if mode == 'train':
         train_params = {}
@@ -91,7 +91,7 @@ def feature_filtering_by_class_means(df, class1_samples, class2_samples, class1_
     else:
         raise ValueError("mode must be either 'train' or 'test'")
 
-def filter_low_expression_features_on_raw_counts(df, unsup_filtering_min_count=5, unsup_filtering_min_observations=3, mode = 'test', unsup_filtering_features_to_keep = None):
+def filter_low_expression_features_on_raw_counts(df, unsup_filtering_min_count=5, unsup_filtering_min_observations=3, mode = 'test', unsup_filtering_features_to_keep = None, **kwargs):
     """
     Filters out features (columns) that are weakly expressed across observations (should be used with raw counts df).
 
@@ -118,23 +118,23 @@ def filter_low_expression_features_on_raw_counts(df, unsup_filtering_min_count=5
     else:
         raise ValueError("mode must be either 'train' or 'test'")
 
-def keep_top_n_features_by_mean(df, n, mode = 'test', top_n_columns = None):
+def keep_top_n_features_by_mean(df, n, mode = 'test', top_n_columns_by_mean = None, **kwargs):
     if mode == 'train':
         train_params = {}
         # Calculate the mean of each column
         col_means = df.mean()
         # Get the top n columns based on their means
-        top_n_columns = col_means.nlargest(n).index
-        train_params['top_n_columns'] = top_n_columns
-        print('Number of features kept by top_n_features_to_keep: ' + str(len(top_n_columns)))
-        return df[top_n_columns].copy(), train_params
+        top_n_columns_by_mean = col_means.nlargest(n).index
+        train_params['top_n_columns_by_mean'] = top_n_columns_by_mean
+        print('Number of features kept by top_n_features_to_keep: ' + str(len(top_n_columns_by_mean)))
+        return df[top_n_columns_by_mean].copy(), train_params
     elif mode == 'test':
-        if top_n_columns is None:
-            raise ValueError("top_n_columns must be provided in test mode")
-        print('Number of features kept for test set: ' + str(len(top_n_columns)))
-        return df[top_n_columns].copy()
+        if top_n_columns_by_mean is None:
+            raise ValueError("top_n_columns_by_mean must be provided in test mode")
+        print('Number of features kept for test set: ' + str(len(top_n_columns_by_mean)))
+        return df[top_n_columns_by_mean].copy()
 
-    return top_n_columns
+    return top_n_columns_by_mean
 
 def prepare_feature_filtering_methods():
     """
@@ -149,7 +149,7 @@ def prepare_feature_filtering_methods():
 
 '''Below are feature-wise scaling methods, such as z-normalization, log-transformation. All assume that rows are samples and columns are features.'''
 
-def log_normalization(df, mean_center = True, mode = 'test', means_of_logs = None):
+def log_normalization(df, mean_center = True, mode = 'test', means_of_logs = None, **kwargs):
     if mode == 'train':
         train_params = {}
         # Log normalization
@@ -170,7 +170,7 @@ def log_normalization(df, mean_center = True, mode = 'test', means_of_logs = Non
     else:
         raise ValueError("mode must be either 'train' or 'test'")
 
-def z_normalization(df, use_std = True, mode = 'test', means = None, stds = None):
+def z_normalization(df, use_std = True, mode = 'test', means = None, stds = None, **kwargs):
     if mode == 'train':
         train_params = {}
         means = df.mean()
@@ -193,7 +193,7 @@ def z_normalization(df, use_std = True, mode = 'test', means = None, stds = None
     else:
         raise ValueError("mode must be either 'train' or 'test'")
 
-def log_normalization_followed_by_z_normalization(df, log_norm_mean_center = False, z_norm_use_std = True, mode = 'test', train_params_log_norm = None, train_params_z_norm = None):
+def log_normalization_followed_by_z_normalization(df, log_norm_mean_center = False, z_norm_use_std = True, mode = 'test', train_params_log_norm = None, train_params_z_norm = None, **kwargs):
     if mode == 'train':
         log_norm_data, train_params_log_norm = log_normalization(df, mean_center = log_norm_mean_center, mode = 'train')
         z_norm_on_log_norm_data, train_params_z_norm = z_normalization(log_norm_data, use_std = z_norm_use_std, mode = 'train')
@@ -205,7 +205,7 @@ def log_normalization_followed_by_z_normalization(df, log_norm_mean_center = Fal
         log_norm_data = log_normalization(df, mode = 'test', **train_params_log_norm)
         return z_normalization(log_norm_data, use_std = z_norm_use_std, mode = 'test', **train_params_z_norm)
 
-def modified_z_normalization(df, mode = 'test', means = None, stds = None):
+def modified_z_normalization(df, mode = 'test', means = None, stds = None, **kwargs):
     '''
     Same as Z-normalization, but features on bigger scales get more importance
     '''
