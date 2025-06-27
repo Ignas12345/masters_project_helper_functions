@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import sklearn
 from sklearn.feature_selection import RFE
 from sklearn.linear_model import LogisticRegression
 from scipy.stats import ttest_ind
@@ -271,7 +272,6 @@ def perform_DE_ranking(df_to_use, class1_samples = None, class2_samples = None, 
 
         # FDR correction
         reject, p_adj = fdrcorrection(p_vals, alpha=0.05)
-        print(p_adj)
         results = pd.DataFrame({
             'feature': df_to_use.columns,
             'Fold Change': fold_changes,
@@ -288,7 +288,10 @@ def perform_DE_ranking(df_to_use, class1_samples = None, class2_samples = None, 
 
         return results['feature'].tolist()
 
-def perform_rfe_ranking(df_to_use, class1_samples , class2_samples, estimator_for_rfe_ranking = LogisticRegression(), step_size_for_rfe_ranking = 1, **kwargs):
+def perform_RFE_ranking(df_to_use, class1_samples , class2_samples, estimator_for_rfe_ranking = LogisticRegression(), step_size_for_rfe_ranking = 1, **kwargs):
+    
+    estimator_for_rfe_ranking = sklearn.base.clone(estimator_for_rfe_ranking)
+
     y = np.array([1] * len(class1_samples) + [0] * len(class2_samples))
     X = df_to_use.loc[class1_samples + class2_samples].copy()
     # Ensure the estimator is fitted on the combined data
@@ -301,12 +304,10 @@ def perform_rfe_ranking(df_to_use, class1_samples , class2_samples, estimator_fo
     ranked_features = pd.Series(ranking, index=X.columns).sort_values()
     return ranked_features.index.tolist()
 
-    
-
-def rank_features_and_keep_top_n_features(X, class1_samples, class2_samples,  feature_ranking_method, n = 100, drop_correlated_features = False, spearman_corr_threshold = 0.9, mode = 'test', features_to_keep = None, **kwargs):
+def rank_features_and_keep_top_n_features(X, class1_samples, class2_samples,  feature_ranking_method, housekeeping_list = None, keep_n_ranked_features = None, drop_correlated_features = False, spearman_corr_threshold = 0.9, mode = 'test', features_to_keep = None, **kwargs):
     """
     Rank features based on a specified feature selection method and keep the top N features.
-    
+
     Parameters:
     - X: DataFrame with rows as samples and columns as features.
     - class1_samples: List of sample indices for class 1.
@@ -317,7 +318,7 @@ def rank_features_and_keep_top_n_features(X, class1_samples, class2_samples,  fe
     - spearman_corr_threshold: Correlation threshold for dropping features.
     - mode: 'train' or 'test'.
     - features_to_keep: List of features to keep (required in 'test' mode).
-    
+
     Returns:
     - In 'train' mode: Tuple (DataFrame with top N ranked features, train_params dictionary).
     - In 'test' mode: DataFrame with top N ranked features.
@@ -325,11 +326,14 @@ def rank_features_and_keep_top_n_features(X, class1_samples, class2_samples,  fe
     if mode == 'train':
         train_params = {}
         # Rank features using the specified method
-        print('Ranking features using method: ', feature_ranking_method.__name__)
-        ranked_features = feature_ranking_method(X, class1_samples, class2_samples, **kwargs)
-        
+        #drop features with 0 std. for stability
+        print('Ranking features using: ' + str(feature_ranking_method.__name__))
+        std_values = X.std()
+        ranked_features = feature_ranking_method(X.loc[:, std_values > 0], class1_samples, class2_samples, **kwargs)
+
         if drop_correlated_features:
             # Drop highly correlated features
+            print('Dropping features greedily, spearman_corr threshold : ' + str(spearman_corr_threshold))
             corr_matrix = X[ranked_features].corr(method='spearman')
             selected = []
             for feat in ranked_features:
@@ -339,17 +343,25 @@ def rank_features_and_keep_top_n_features(X, class1_samples, class2_samples,  fe
                 selected.append(feat)
             ranked_features = selected
         # Keep only the top N features
-        if n is None or n > len(ranked_features):
-            n = len(ranked_features)
-        ranked_features = ranked_features[:n]
-
+        if keep_n_ranked_features is None or keep_n_ranked_features > len(ranked_features):
+            keep_n_ranked_features = len(ranked_features)
+        ranked_features = ranked_features[:keep_n_ranked_features]
+        if housekeeping_list is not None:
+          print('Adding housekeeping features')
+          #add housekeeping features if they are in X.columns but not in ranked_features:
+          housekeeping_list_to_remain = [feature for feature in housekeeping_list if feature in X.columns]
+          for feature in housekeeping_list_to_remain:
+            if feature not in ranked_features:
+              ranked_features.append(feature)
+        print('Keeping top ' + str(len(ranked_features)) + ' features')
+        ranked_features = list(ranked_features)
         train_params['features_to_keep'] = ranked_features
         return X[ranked_features].copy(), train_params
 
     elif mode == 'test':
         if features_to_keep is None:
             raise ValueError("features_to_keep must be provided in test mode")
+        print('Keept top ' + str(len(features_to_keep)) + ' features from training phase for testing')
         return X[features_to_keep].copy()
-    
     else:
         raise ValueError("mode must be either 'train' or 'test'")

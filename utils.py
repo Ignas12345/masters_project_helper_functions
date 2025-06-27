@@ -1,5 +1,22 @@
 import pandas as pd
 
+def get_folds_by_comment(train_fold_df, comments: list | str):
+  if type(comments) == str:
+    comments = [comments]
+  indices = []
+  for comment in comments:
+    indices.extend(train_fold_df[train_fold_df['comment'] == comment].index.tolist())
+  return indices
+
+def map_items_to_names(items_dict):
+  name_dict = {}
+  for key in items_dict:
+      try:
+        name_dict[key] = items_dict[key].__name__
+      except AttributeError:
+        name_dict[key] = items_dict[key]
+  return name_dict
+
 def collapse_columns_by_string(df, string_slice=slice(-1, -12, -1)):
     """
     Collapses columns in a DataFrame based on matching string of column names (last `string_len` characters).

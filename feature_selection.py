@@ -1,12 +1,12 @@
 import pandas as pd
 from copy import deepcopy
 import numpy as np
-from sklearn.feature_selection import SequentialFeatureSelector
+from sklearn.base import clone
+from sklearn.feature_selection import SequentialFeatureSelector, RFECV
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import LeaveOneOut, StratifiedKFold, cross_val_score
 from scipy.stats import ttest_ind
 from statsmodels.stats.multitest import fdrcorrection
-from tqdm import tqdm
 
 def helper_ffs_calculate_mean_training_score(X, y, classifier, skf):
     """
@@ -28,7 +28,7 @@ def helper_ffs_calculate_mean_training_score(X, y, classifier, skf):
     return np.mean(training_scores)
 
 # Updated function (mostly written by ChatGPT)
-def forward_feature_selection_cv(X_cv, y_cv, classifier, max_features=20, allow_n_rounds_without_improvement=5, n_splits=5, seed=42):
+def forward_feature_selection_cv(X_cv, y_cv, classifier, max_features=20, allow_n_rounds_without_improvement=5, n_splits=5, seed=42, **kwargs):
     """
     Perform forward feature selection over the provided set of candidate features
     and evaluate the model using stratified k-fold cross-validation. The function
@@ -46,6 +46,8 @@ def forward_feature_selection_cv(X_cv, y_cv, classifier, max_features=20, allow_
     Returns:
         best_feature_set (list): List of feature names that produced the best CV score.
     """
+    # Ensure the classifier is cloned to avoid modifying the original instance
+    classifier = clone(classifier)
     candidate_features = list(X_cv.columns)
     current_features = []
     remaining_features = deepcopy(candidate_features)
@@ -123,7 +125,7 @@ def forward_feature_selection_cv(X_cv, y_cv, classifier, max_features=20, allow_
     return best_feature_set
     
 #ChatGPT funkcija
-def forward_feature_selection_cv_first_version(X_cv, y_cv, classifier, max_features=20, allow_n_rounds_without_improvement = 3, n_splits=5, seed=42):
+def forward_feature_selection_cv_without_evaluation_on_train_set(X_cv, y_cv, classifier, max_features=20, allow_n_rounds_without_improvement = 3, n_splits=5, seed=42, **kwargs):
     """
     Perform forward feature selection over the provided set of candidate features
     (which could be the top DE features) and evaluate the model using stratified k-fold
@@ -142,6 +144,8 @@ def forward_feature_selection_cv_first_version(X_cv, y_cv, classifier, max_featu
         best_feature_set (list): List of feature names that produced the best CV score.
         performance_history (list of dicts): A log of performance at each round.
     """
+    # Clone the classifier to avoid modifying the original instance.
+    classifier = clone(classifier)
     # Ensure the candidate features are in a list.
     candidate_features = list(X_cv.columns)
     current_features = []
@@ -201,7 +205,7 @@ def forward_feature_selection_cv_first_version(X_cv, y_cv, classifier, max_featu
     print(f"Best feature set ({len(best_feature_set)} features) with CV score: {best_score_overall:.4f}")
     return best_feature_set
 
-def sfs_feature_selection(X_cv, y_cv, classifier, n_features=20, tol = None, n_splits=5, seed=42):
+def sfs_feature_selection(X_cv, y_cv, classifier, max_features=20, tol = None, n_splits=5, seed=42, **kwargs):
     """
     Perform forward feature selection using scikit-learn's SequentialFeatureSelector.
 
@@ -217,12 +221,15 @@ def sfs_feature_selection(X_cv, y_cv, classifier, n_features=20, tol = None, n_s
         selected_features (list): List of feature names selected by SFS.
         cv_score (float): Mean cross-validation score with the selected features.
     """
+    # Ensure the classifier is cloned to avoid modifying the original instance
+    classifier = clone(classifier)
+
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
 
     # Create the SequentialFeatureSelector object; note that direction='forward' configures forward selection.
     sfs = SequentialFeatureSelector(
         classifier,
-        n_features_to_select=n_features,
+        n_features_to_select=max_features,
         tol = tol,
         direction='forward',
         cv=cv
@@ -244,207 +251,75 @@ def sfs_feature_selection(X_cv, y_cv, classifier, n_features=20, tol = None, n_s
 
     return selected_features
 
-
-def kfold_cv(X_cv, y_cv, final_classifier, n_splits=5, print_incorrect = False, seed=42):
+def rfecv_feature_selection(X_cv, y_cv, classifier, max_features=20, n_splits=5, seed=42, **kwargs):
     """
-    Perform stratified k-fold cross-validation for a given classifier.
+    Perform recursive feature elimination (RFE) to select features. Use sklearn's RFECV
 
     Parameters:
-        X_cv (pd.DataFrame): Feature set.
-        y_cv (pd.Series or np.array): Labels.
-        final_classifier: A scikit-learn compatible classifier.
-        label_dict (dict, optional): Optional mapping for labels.
+        X_cv (pd.DataFrame): DataFrame of candidate features.
+        y_cv (array-like): Target class labels.
+        classifier: A scikit-learn compatible classifier.
+        max_features (int): Number of top features to keep.
+        n_splits (int): Number of folds for cross-validation.
         seed (int): Random seed for reproducibility.
-        n_splits (int): Number of folds.
 
     Returns:
-        results_df (pd.DataFrame): DataFrame containing sample names, correctness of prediction,
-                                   and the fold number.
+        selected_features (list): List of feature names selected by RFE.
     """
-    np.random.seed(seed)
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
-    results = []
-    total_misclassified = 0
-    print("\nStarting Stratified K-Fold Cross-Validation\n")
-    # Loop through the folds; using tqdm for a progress bar with total equal to n_splits
-    for fold, (train_index, test_index) in enumerate(tqdm(skf.split(X_cv, y_cv), total=n_splits, desc="CV Progress"), start=1):
-        # Split data into training and testing sets based on the current fold
-        X_train, X_test = X_cv.iloc[train_index], X_cv.iloc[test_index]
-        y_train, y_test = y_cv[train_index], y_cv[test_index]
-
-        # Train the classifier on the training set
-        final_classifier.fit(X_train, y_train)
-        # Predict on the test set
-        y_pred = final_classifier.predict(X_test)
-
-        # Iterate over the test set samples
-        for sample_idx, pred, true in zip(test_index, y_pred, y_test):
-            sample_name = X_cv.index[sample_idx]  # Get the sample name from the index
-            results.append({
-                "Sample": sample_name,
-                "Correct": int(pred == true),
-                "Fold": fold
-            })
-        #print accuracy on test fold i, incorrect samples in that fold
-        incorrect_samples = X_cv.iloc[test_index][y_pred != y_test].index.to_list()
-        total_misclassified += len(incorrect_samples)
-        print(f"Fold {fold} accuracy: {accuracy_score(y_test, y_pred)}")
-        print(f"Number of misclassified samples in Fold {fold}: {len(incorrect_samples)}")
-        if print_incorrect and len(incorrect_samples) > 0:
-          print(f"Incorrectly classified samples in Fold {fold}:")
-          print(incorrect_samples)
-
-    print("\nCross-Validation completed!")
-    # Convert the list of results to a DataFrame for further analysis
-    results_df = pd.DataFrame(results)
-    # Print summary
-    print("\nOverall Accuracy:", results_df["Correct"].mean())
-    print("total misclassified samples: ")
-    print("\nDetailed Results:")
-
-    return results_df
-
-def loo_cv(X_cv, y_cv, final_classifier, label_dict = None, seed = 42):
-
-  np.random.seed(seed)
-  loo = LeaveOneOut()
-  results = []
-
-  # Progress bar for tracking LOOCV progress
-  print("\nStarting Leave-One-Out Cross-Validation\n")
-  for train_index, test_index in tqdm(loo.split(X_cv), total=np.shape(X_cv)[1], desc="LOOCV Progress"):
-      # Split data
-      X_train, X_test = X_cv.iloc[train_index], X_cv.iloc[test_index]
-      y_train, y_test = y_cv[train_index], y_cv[test_index]
-      test_sample_name = X_cv.index[test_index][0]  # Get left-out sample name
+    # Ensure the classifier is cloned to avoid modifying the original instance
+    classifier = clone(classifier)
+    rfecv = RFECV(
+        estimator=classifier,
+        step=1,
+        cv=StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed),
+        scoring='accuracy_balanced_accuracy',
+    )
+    rfecv.fit(X_cv, y_cv)
+    selected_features = X_cv.columns[rfecv.support_].tolist()
+    if len(selected_features) > max_features:
+        selected_features = selected_features[:max_features]
+    print(f"Selected features with rfecv ({len(selected_features)}): {selected_features}")
+    return selected_features
 
 
-      # Train model with optimal features
-      #svc_final = SVC(kernel="linear", C = 0.1, class_weight = 'balanced', random_state=42, probability=True)
-      final_classifier.fit(X_train, y_train)
+def keep_top_n_features(X_cv, y_cv, classifier, max_features=20, n_splits=5, seed=42, **kwargs):
+    "keep top n features"
+    return X_cv.columns[:max_features].tolist()
 
-      # Predict class and get confidence
-      y_pred = final_classifier.predict(X_test)
-      #decision_values = svc_final.decision_function(X_test)  # Signed distance to the decision boundary
-      #confidence_score = np.abs(decision_values[0])  # Larger magnitude → higher confidence
+def keep_top_n_features_by_cv(X_cv, y_cv, classifier, max_features=20, n_splits=5, seed=42, **kwargs):
+    """
+    Keep the top n features based on cross-validation performance.
 
-      # Compute margin width
-      #support_vectors = svc_final.support_vectors_
-      #dual_coef = svc_final.dual_coef_
-      #margin_width = 2 / np.linalg.norm(dual_coef)  # Width of the margin
+    Parameters:
+        X_cv (pd.DataFrame): DataFrame of candidate features.
+        y_cv (array-like): Target class labels.
+        classifier: A scikit-learn compatible classifier.
+        max_features (int): Number of top features to keep.
+        n_splits (int): Number of folds for cross-validation.
+        seed (int): Random seed for reproducibility.
 
-      # Store results
-      results.append({
-          "Sample": test_sample_name,
-          "Correct": int(y_pred[0] == y_test[0]),
-          #"Confidence": confidence_score,
-          #"Margin Width": margin_width,
-      })
+    Returns:
+        selected_features (list): List of feature names selected by CV.
+    """
+    # Ensure the classifier is cloned to avoid modifying the original instance
+    classifier = clone(classifier)
 
-  print("\nLOOCV completed!")
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
 
-  # Convert results into a DataFrame
-  results_df = pd.DataFrame(results)
+    # Evaluate each feature individually and store their scores
+    feature_scores = []
+    feature_set = []
+    for i,feature in enumerate(X_cv.columns):
+        if i> max_features:
+            break
+        feature_set.append(feature)
+        # Use cross-validation to evaluate the performance of the classifier with this feature
+        scores = cross_val_score(classifier, X_cv[feature_set], y_cv, cv=cv)
+        feature_scores.append(scores.mean())
 
-  # Print summary
-  print("\nOverall LOOCV Accuracy:", results_df["Correct"].mean())
-  print("\nDetailed Results:")
-  print(results_df)
+    best_number_of_features = np.argmax(feature_scores) + 1  # +1 because argmax returns index starting from 0
+    selected_features = X_cv.columns[:best_number_of_features].tolist() 
 
-  incorrect_samples = results_df[results_df['Correct'] == 0]
-  print("\nIncorrectly classified samples:")
-  print(incorrect_samples)
-  if label_dict is not None:
-      for sample in incorrect_samples['Sample']:
-          print(sample + ' label is: ' + label_dict[sample] + '\n')
+    print(f"Selected top {len(selected_features)} features based on CV performance: {selected_features}")
 
-  return results_df
-
-def perform_DE_test(df_to_use, class1_samples,  class2_samples):
-    # Extract expression data for the two groups
-    data1 = df_to_use.loc[class1_samples].copy()
-    data2 = df_to_use.loc[class2_samples].copy()
-
-    # Perform unpaired t-test
-    p_vals = []
-    fold_changes = []
-    for feature in df_to_use.columns:
-        vals1 = data1[feature].values.astype(float)
-        vals2 = data2[feature].values.astype(float)
-        t_stat, p = ttest_ind(vals1, vals2, equal_var=False)
-        p_vals.append(p)
-
-        fc = np.median(vals1 + 1) / np.median(vals2 + 1)
-        if fc < 1:
-            fc =  - 1 / fc
-        # Median-based fold change
-        #fold_changes.append(np.log2(fc))  # log2 FC
-        fold_changes.append(fc)
-
-    # FDR correction
-    reject, p_adj = fdrcorrection(p_vals, alpha=0.05)
-    results = pd.DataFrame({
-        'feature': df_to_use.columns,
-        'Fold Change': fold_changes,
-        'pval': p_vals,
-        'fdr': p_adj,
-        'significant': reject
-    })
-
-    return results
-
-def get_top_DE_features(DE_results, n_features_to_return = 17, return_separately = False, ignore_p_value = False):
-  #n_features_to_return is the number of upregulated and of downregulated features that will be returned
-  
-  if ignore_p_value == False:
-    sig_results = DE_results[DE_results['significant']].copy()
-  else:
-    sig_results = DE_results.copy()
-
-  top_up = sig_results.sort_values("Fold Change", ascending=False).head(n_features_to_return)
-  top_down = sig_results.sort_values("Fold Change").head(n_features_to_return)[::-1]
-  top_features = pd.concat([top_up, top_down])
-
-  if return_separately:
-    return top_up, top_down
-  return top_features
-
-#below are defined functions for feature ranking
-
-def perform_DE_ranking(df_to_use, mode = "test", class1_samples = None, class2_samples = None,  ignore_p_value=False):
-    if mode == "train":
-        if class1_samples is None or class2_samples is None:
-            raise ValueError("For training mode, class1_samples and class2_samples must be provided.")
-        # Extract expression data for the two groups
-        data1 = df_to_use.loc[class1_samples].copy()
-        data2 = df_to_use.loc[class2_samples].copy()
-
-        # Perform unpaired t-test
-        p_vals = []
-        fold_changes = []
-        for feature in df_to_use.columns:
-            vals1 = data1[feature].values.astype(float)
-            vals2 = data2[feature].values.astype(float)
-            t_stat, p = ttest_ind(vals1, vals2, equal_var=False)
-            p_vals.append(p)
-
-            fc = np.median(vals1 + 1) / np.median(vals2 + 1)
-            if fc < 1:
-                fc =  - 1 / fc
-            # Median-based fold change
-            fold_changes.append(fc)
-
-        # FDR correction
-        reject, p_adj = fdrcorrection(p_vals, alpha=0.05)
-        results = pd.DataFrame({
-            'feature': df_to_use.columns,
-            'Fold Change': fold_changes,
-            'abs_Fold Change': np.abs(fold_changes),
-            'pval': p_vals,
-            'fdr': p_adj,
-            'significant': reject
-        })
-        #now sort features firstly significantly, then by absolute fold change
-        results = results.sort_values(by=['significant', 'abs_Fold Change'], ascending=[False, False])
-        #return only the 'feature' column in order of significance
-        return results['feature'].tolist()
+    return selected_features
