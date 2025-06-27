@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 def prepare_sample_list(elements, sample_names:list = None, label_sample_dict:dict = None, sample_ordering: np.ndarray = None, sample_label_dict = None):
   '''checks elements against sample_names, a label dictionary and a sample ordering. Returns a list of sample names. At least one of
@@ -232,6 +233,205 @@ def plot_two_features(df_1, feature_1, feature_2, df_2 = None, samples_to_use:li
       plt.savefig(f'{title}.png')
     else:
       plt.savefig(f'{feature_1}_{feature_2}.png')
+  plt.show()
+
+def plot_single_feature_use_text(df, feature, samples_to_use:list|None = None, noise_level = 0.05, sample_ordering:list|None = None,
+                                  sample_label_dict : dict = None, label_color_dict = None, samples_to_higlight: list|None = None,
+                                  xlim = None, ylim = None, show_legend = True, title = None, slice_for_samples:slice = None, use_numbers:bool = None, save_plot = False, random_seed=42):
+  '''kaip kita plottinim'o funkcija, bet naudoja teksta arba skaicius vietoj tasku.'''
+  #paima df, kuriu rows yra observazijos ir padaro dvieju bruozu plot'a.
+  #label_dict turėtų turėti sample_ids kaip raktus ir etiketes kaip values
+
+  df = df.copy()
+  #add noise column to df
+  np.random.seed(random_seed)
+  df['noise'] = np.random.normal(loc=0, scale=noise_level, size=len(df))
+
+  if use_numbers and sample_ordering is None:
+    raise Exception('sample_ordering should be provided if using numbers to plot')
+
+  if sample_label_dict is None:
+    sample_label_dict = {}
+    for sample in df.columns:
+      sample_label_dict[sample] = 'sample'
+  label_sample_dict = invert_label_dict(sample_label_dict, original_keys='samples')
+
+  if samples_to_use is None:
+    samples_to_use = df.index.copy()
+  else:
+    samples_to_use = prepare_sample_list(elements = samples_to_use, sample_names = df.index.copy(), label_sample_dict = label_sample_dict, sample_ordering = sample_ordering)
+
+  if label_color_dict is None:
+    label_color_dict = create_label_colors(sample_label_dict)
+  labels_initial = list(label_color_dict.keys())
+  labels = [label for label in labels_initial if label in label_sample_dict.keys()]
+
+  x_data = df[feature].copy()
+  y_data = df['noise'].copy()
+                                    
+  if ylim is None:
+    y_min = min(y_data)
+    y_max = max(y_data)
+    buffer = (y_max - y_min)
+    ylim = [y_min - buffer, y_max + buffer]
+
+  plt.figure()
+  used_labels = []
+  patches_for_legend = []
+
+  if xlim is None:
+    x_min = min(x_data)
+    x_max = max(x_data)
+    print('feature "' +feature+ '" ranges from: ' + str(x_min) + ' to ' +str(x_max))
+    buffer = (x_max - x_min)/10
+    xlim = [x_min - buffer, x_max + buffer]
+
+  for label in labels:
+    #used_x = np.array([])
+    #used_y = np.array([])
+    samples_with_label = list(set(label_sample_dict[label]).intersection(set(samples_to_use)))
+    if len(samples_with_label) > 0:
+      used_labels += [label]
+      x_coords = x_data.loc[samples_with_label].to_numpy()
+      y_coords = y_data.loc[samples_with_label].to_numpy()
+      #used_x = np.append(used_x, x_coords)
+      #used_y = np.append(used_y, y_coords)
+      if use_numbers:
+        indices = []
+        for sample in samples_with_label:
+          indices += list(np.where(sample_ordering == sample)[0])
+        samples_with_label = indices
+      elif slice_for_samples is not None:
+        samples_with_label = [sample[slice_for_samples] for sample in samples_with_label]
+      for x, y, t in zip(x_coords, y_coords, samples_with_label):
+        if x > xlim[0] and x < xlim[1] and y > ylim[0] and y < ylim[1]:
+           plt.text(x, y, t, fontsize=10, color= label_color_dict[label])
+
+
+  for label in used_labels:
+    patches_for_legend += [mpatches.Patch(color=label_color_dict[label], label=label)]
+
+
+
+  plt.xlim(xlim)
+  plt.ylim(ylim)
+  if show_legend:
+    plt.legend(handles = patches_for_legend)
+  plt.xlabel(feature)
+  plt.ylabel('noise of level: ' + str(noise_level))
+  if title is not None:
+    plt.title(title)
+  if save_plot:
+    if title is not None:
+      plt.savefig(f'{title}.png')
+    else:
+      plt.savefig(f'{feature}.png')
+  plt.show()
+
+def plot_two_features_use_text(df_1, feature_1, feature_2, df_2 = None, use_numbers = False, slice_for_samples:slice = None, samples_to_use:list|None = None, sample_ordering:list|None = None,
+                                  sample_label_dict : dict = None, label_color_dict = None,
+                                  xlim = None, ylim = None, show_legend = True, title = None, save_plot = False):
+  '''kaip kita plottinim'o funkcija, bet naudoja teksta arba skaicius vietoj tasku.'''
+  #paima df, kuriu rows yra observazijos ir padaro dvieju bruozu plot'a.
+  #label_dict turėtų turėti sample_ids kaip raktus ir etiketes kaip values
+
+  '''
+  if sample_ordering is not None:
+    if df_2 is not None:
+      if np.any(df_2.index != sample_ordering):
+        print('Warning: df_2 index is not the same as sample_ordering. Better to ensure that the ordering is the same as sample order to avoid incorrect labels or incorrect plotting if using different data frames')
+
+    if np.any(df_1.index != sample_ordering):
+      print('Warning: df_1 index is not the same as sample_ordering. Better to ensure that the ordering is the same as sample order to avoid incorrect labels or incorrect plotting if using different data frames')
+
+  #nuo cia assuminam, kad samples abiejose df yra isrikiuoti pagal ta tvarka arba kad meginiu pavadinimai naudojami
+  '''
+  df_1 = df_1.copy()
+  if df_2 is None:
+    df_2 = df_1.copy()
+  else:
+    df_2 = df_2.copy()
+
+  if use_numbers and sample_ordering is None:
+    raise Exception('sample_ordering should be provided if using numbers to plot')
+
+  if sample_label_dict is None:
+    sample_label_dict = {}
+    for sample in df_1.columns:
+      sample_label_dict[sample] = 'sample'
+  label_sample_dict = invert_label_dict(sample_label_dict, original_keys='samples')
+
+  if samples_to_use is None:
+    samples_to_use = df_1.index.copy()
+  else:
+    samples_to_use = prepare_sample_list(elements = samples_to_use, sample_names = df_1.index.copy(), label_sample_dict = label_sample_dict, sample_ordering = sample_ordering)
+
+  if label_color_dict is None:
+    label_color_dict = create_label_colors(sample_label_dict)
+  labels_initial = list(label_color_dict.keys())
+  labels = [label for label in labels_initial if label in label_sample_dict.keys()]
+
+  x_data = df_1[feature_1].copy()
+  y_data = df_2[feature_2].copy()
+
+  plt.figure()
+  used_labels = []
+  patches_for_legend = []
+
+  if xlim is None:
+    x_min = min(x_data)
+    x_max = max(x_data)
+    print('feature "' +feature_1+ '" ranges from: ' + str(x_min) + ' to ' +str(x_max))
+    buffer = (x_max - x_min)/10
+    xlim = [x_min - buffer, x_max + buffer]
+  if ylim is None:
+    y_min = min(y_data)
+    y_max = max(y_data)
+    print('feature "' +feature_2+ '" ranges from: ' + str(y_min) + ' to ' +str(y_max))
+    buffer = (y_max - y_min)/10
+    ylim = [y_min - buffer, y_max + buffer]
+
+  for label in labels:
+    #used_x = np.array([])
+    #used_y = np.array([])
+    samples_with_label = list(set(label_sample_dict[label]).intersection(set(samples_to_use)))
+    if len(samples_with_label) > 0:
+      used_labels += [label]
+      x_coords = x_data.loc[samples_with_label].to_numpy()
+      y_coords = y_data.loc[samples_with_label].to_numpy()
+      #used_x = np.append(used_x, x_coords)
+      #used_y = np.append(used_y, y_coords)
+      if use_numbers:
+        indices = []
+        for sample in samples_with_label:
+          indices += list(np.where(sample_ordering == sample)[0])
+        samples_with_label = indices
+      elif slice_for_samples is not None:
+        samples_with_label = [sample[slice_for_samples] for sample in samples_with_label]
+      for x, y, t in zip(x_coords, y_coords, samples_with_label):
+        if x > xlim[0] and x < xlim[1] and y > ylim[0] and y < ylim[1]:
+           plt.text(x, y, t, fontsize=10, color= label_color_dict[label])
+
+
+  for label in used_labels:
+    patches_for_legend += [mpatches.Patch(color=label_color_dict[label], label=label)]
+
+
+
+  plt.xlim(xlim)
+  plt.ylim(ylim)
+  if show_legend:
+    plt.legend(handles = patches_for_legend)
+  plt.xlabel(feature_1)
+  plt.ylabel(feature_2)
+  if title is not None:
+    plt.title(title)
+  if save_plot:
+    if title is not None:
+      plt.savefig(f'{title}.png')
+    else:
+      plt.savefig(f'{feature_1}_{feature_2}.png')
+
   plt.show()
 
   
