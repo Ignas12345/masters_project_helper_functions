@@ -248,9 +248,10 @@ def prepare_normalization_methods():
     }
 
 #Below are some feature ranking methods and a method for feature filtering with respect to some feature ranking):
-def perform_DE_ranking(df_to_use, class1_samples = None, class2_samples = None,  ignore_p_value=False, **kwargs):
-        if class1_samples is None or class2_samples is None:
-            raise ValueError("For training mode, class1_samples and class2_samples must be provided.")
+def perform_identity_ranking(X_train, class1_samples , class2_samples, **kwargs):
+  return X_train.columns
+
+def perform_DE_ranking(df_to_use, class1_samples, class2_samples, ignore_p_value=False, **kwargs):
         # Extract expression data for the two groups
         data1 = df_to_use.loc[class1_samples].copy()
         data2 = df_to_use.loc[class2_samples].copy()

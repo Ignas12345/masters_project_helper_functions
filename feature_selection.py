@@ -8,6 +8,9 @@ from sklearn.model_selection import LeaveOneOut, StratifiedKFold, cross_val_scor
 from scipy.stats import ttest_ind
 from statsmodels.stats.multitest import fdrcorrection
 
+def select_all_features(X_train, y_train, **kwargs):
+  return X_train.columns
+
 def helper_ffs_calculate_mean_training_score(X, y, classifier, skf):
     """
     Helper function for forward_feature_selection_cv that calculates the mean training score for the given features and labels using a given instance of StratifiedKFold.
@@ -28,7 +31,7 @@ def helper_ffs_calculate_mean_training_score(X, y, classifier, skf):
     return np.mean(training_scores)
 
 # Updated function (mostly written by ChatGPT)
-def forward_feature_selection_cv(X_cv, y_cv, classifier, max_features=20, allow_n_rounds_without_improvement=5, n_splits=5, seed=42, **kwargs):
+def forward_feature_selection_cv(X_cv, y_cv, classifier, max_features=10, allow_n_rounds_without_improvement=5, n_splits=5, seed=42, **kwargs):
     """
     Perform forward feature selection over the provided set of candidate features
     and evaluate the model using stratified k-fold cross-validation. The function
@@ -125,7 +128,7 @@ def forward_feature_selection_cv(X_cv, y_cv, classifier, max_features=20, allow_
     return best_feature_set
     
 #ChatGPT funkcija
-def forward_feature_selection_cv_without_evaluation_on_train_set(X_cv, y_cv, classifier, max_features=20, allow_n_rounds_without_improvement = 3, n_splits=5, seed=42, **kwargs):
+def forward_feature_selection_cv_without_evaluation_on_train_set(X_cv, y_cv, classifier, max_features=10, allow_n_rounds_without_improvement = 3, n_splits=5, seed=42, **kwargs):
     """
     Perform forward feature selection over the provided set of candidate features
     (which could be the top DE features) and evaluate the model using stratified k-fold
@@ -205,7 +208,7 @@ def forward_feature_selection_cv_without_evaluation_on_train_set(X_cv, y_cv, cla
     print(f"Best feature set ({len(best_feature_set)} features) with CV score: {best_score_overall:.4f}")
     return best_feature_set
 
-def sfs_feature_selection(X_cv, y_cv, classifier, max_features=20, tol = None, n_splits=5, seed=42, **kwargs):
+def sfs_feature_selection(X_cv, y_cv, classifier, max_features=10, tol = None, n_splits=5, seed=42, **kwargs):
     """
     Perform forward feature selection using scikit-learn's SequentialFeatureSelector.
 
@@ -251,7 +254,7 @@ def sfs_feature_selection(X_cv, y_cv, classifier, max_features=20, tol = None, n
 
     return selected_features
 
-def rfecv_feature_selection(X_cv, y_cv, classifier, max_features=20, n_splits=5, seed=42, **kwargs):
+def rfecv_feature_selection(X_cv, y_cv, classifier, max_features=10, n_splits=5, seed=42, **kwargs):
     """
     Perform recursive feature elimination (RFE) to select features. Use sklearn's RFECV
 
@@ -282,11 +285,11 @@ def rfecv_feature_selection(X_cv, y_cv, classifier, max_features=20, n_splits=5,
     return selected_features
 
 
-def keep_top_n_features(X_cv, y_cv, classifier, max_features=20, n_splits=5, seed=42, **kwargs):
+def keep_top_n_features(X_cv, y_cv, classifier, max_features=10, n_splits=5, seed=42, **kwargs):
     "keep top n features"
     return X_cv.columns[:max_features].tolist()
 
-def keep_top_n_features_by_cv(X_cv, y_cv, classifier, max_features=20, n_splits=5, seed=42, **kwargs):
+def keep_top_n_features_by_cv(X_cv, y_cv, classifier, max_features=10, n_splits=5, seed=42, **kwargs):
     """
     Keep the top n features based on cross-validation performance.
 
