@@ -206,7 +206,7 @@ def prepare_folds_for_experiment(sample_label_dict, experiment_name):
     i = j + 1
     train_fold = [sample for sample in samples_to_use if sample != samples_to_use[j]]
     test_fold = list(set(samples_to_use) - set(train_fold))
-    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, com_a)
+    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, sample_label_dict, com_a)
 
   #then with bootstrap an leave-10-out-cv folds
   for j in (range(b)):
@@ -226,7 +226,7 @@ def prepare_folds_for_experiment(sample_label_dict, experiment_name):
         numer_of_folds_discarded += 1
 
 
-    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, com_b)
+    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, sample_label_dict, com_b)
   print(numer_of_folds_discarded)
 
   #stratified leave_10_out_cv folds
@@ -246,7 +246,7 @@ def prepare_folds_for_experiment(sample_label_dict, experiment_name):
       if keep_sampling:
         numer_of_folds_discarded += 1
 
-    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, com_c)
+    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, sample_label_dict, com_c)
   print(numer_of_folds_discarded)
 
   #bootstrap folds
@@ -266,7 +266,7 @@ def prepare_folds_for_experiment(sample_label_dict, experiment_name):
       if keep_sampling:
         numer_of_folds_discarded += 1
 
-    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, com_d)
+    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, sample_label_dict, com_d)
   print(numer_of_folds_discarded)
 
   #stratified_bootstrap folds
@@ -286,7 +286,7 @@ def prepare_folds_for_experiment(sample_label_dict, experiment_name):
       if keep_sampling:
         numer_of_folds_discarded += 1
 
-    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, com_e)
+    train_folds_df, test_folds_df = put_folds_into_df(train_folds_df, test_folds_df, i, train_fold, test_fold, classes_to_use, sample_label_dict, com_e)
   print(numer_of_folds_discarded)
 
   return train_folds_df, test_folds_df, info_df
