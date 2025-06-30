@@ -1,4 +1,5 @@
 import sklearn.base
+from sklearn._config import set_config
 import pandas as pd
 import numpy as np
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, recall_score, precision_score, brier_score_loss, matthews_corrcoef
@@ -8,6 +9,8 @@ import ast
 import utils
 import preprocessing_methods as pp
 import plotting
+
+set_config(transform_output='pandas')
 
 def run_pre_processing_on_train_set(X_train, pre_processing_methods, **kwargs):
   print('Running pre processing on train set')
