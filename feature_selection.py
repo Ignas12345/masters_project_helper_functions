@@ -272,7 +272,7 @@ def rfecv_feature_selection(X_cv, y_cv, classifier, max_features=20, n_splits=5,
         estimator=classifier,
         step=1,
         cv=StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed),
-        scoring='accuracy_balanced_accuracy',
+        scoring='balanced_accuracy',
     )
     rfecv.fit(X_cv, y_cv)
     selected_features = X_cv.columns[rfecv.support_].tolist()
