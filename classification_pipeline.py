@@ -182,7 +182,7 @@ def run_pipeline_on_loocv_folds_and_record_performance(df, fold_path, experiment
       classification_model = classification_method()
 
   if 'feature_ranking_method' in kwargs and 'estimator_for_rfe_ranking' not in kwargs:
-    if kwargs['feature_ranking_method'] == pp.perform_RFE_ranking:
+    if kwargs['feature_ranking_method'].__name__ == 'perform_RFE_ranking':
       kwargs['estimator_for_rfe_ranking'] = sklearn.base.clone(classification_model)
 
   if 'classifier_for_feature_selection' not in kwargs:
