@@ -120,7 +120,7 @@ def run_pipeline_across_folds(df, sample_label_dict, train_folds_df, test_folds_
     for key in results_for_single_fold:
       results_df.loc[fold_index, key] = results_for_single_fold[key]
     if autosave:
-      results_df.to_csv(save_path + 'results_df_autosave.csv')
+      results_df.to_csv(save_path + 'results_df_autosave.csv', sep = ';')
 
   return results_df
 
