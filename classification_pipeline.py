@@ -80,7 +80,7 @@ def run_pipeline_for_single_fold(X_train, y_train, X_test, y_test, pre_processin
     'number_of_features_used' : number_of_features_used
   }
 
-  print('results for samples' + str(X_test.index.to_list()))
+  print('results: ')
   print(results_dict)
 
   if number_of_features_used <= 20:
@@ -93,6 +93,73 @@ def run_pipeline_for_single_fold(X_train, y_train, X_test, y_test, pre_processin
 
 
   return results_dict
+
+def run_pipeline_across_folds(df, sample_label_dict, train_folds_df, test_folds_df, info_df, fold_indices, pre_processing_methods, feature_selection_method, classification_model, autosave = True, save_path = '', **kwargs):
+  
+  results_df = pd.DataFrame(index=info_df.index, columns=['sample', 'prediction', 'prob_class_1', 'true label'])
+
+  for fold_index in fold_indices:
+    print(f'Fold {fold_index}')
+
+    training_samples = ast.literal_eval(train_folds_df.iloc[fold_index]['samples'])
+    testing_samples = ast.literal_eval(test_folds_df.iloc[fold_index]['samples'])
+    X_train = df.loc[training_samples].copy()
+    y_train = [sample_label_dict[sample] for sample in training_samples]
+    y_train = [int(1) if label == kwargs['smaller_group_label'] else int(0) for label in y_train]
+    kwargs['class1_samples'] = [sample for sample in X_train.index if sample_label_dict[sample] == kwargs['smaller_group_label']]
+    kwargs['n_splits'] = min(len(kwargs['class1_samples']), 5)
+    kwargs['class2_samples'] = [sample for sample in X_train.index if sample_label_dict[sample] == kwargs['larger_group_label']]
+
+    X_test = df.loc[testing_samples].copy()
+    y_test = [sample_label_dict[sample] for sample in testing_samples]
+    y_test = [int(1) if label == kwargs['smaller_group_label'] else int(0) for label in y_test]
+
+    results_for_single_fold = run_pipeline_for_single_fold(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test,
+                                                            pre_processing_methods=pre_processing_methods, feature_selection_method=feature_selection_method,
+                                                            classification_model=classification_model, **kwargs)
+    for key in results_for_single_fold:
+      results_df.loc[fold_index, key] = results_for_single_fold[key]
+    if autosave:
+      results_df.to_csv(save_path + 'results_df_autosave.csv')
+
+  return results_df
+
+def prepare_and_run_pipeline_on_folds(df, fold_path, fold_indices, experiment_name, sample_label_dict, pre_processing_methods, feature_selection_method, classification_method, existing_results_df = None, **kwargs):
+  
+  df = df.copy()
+  info_df = pd.read_csv(fold_path + 'info_df_' + f'{experiment_name}.csv', index_col = 0)
+  train_folds_df = pd.read_csv(fold_path + 'train_folds_' + f'{experiment_name}.csv', index_col = 0)
+  test_folds_df = pd.read_csv(fold_path + 'test_folds_' + f'{experiment_name}.csv', index_col = 0)
+  group_labels = [label for label in list(set(sample_label_dict.values())) if label != 'unused']
+  kwargs['smaller_group_label'] = min(group_labels, key=lambda x: len([sample for sample, label in sample_label_dict.items() if label == x]))
+  kwargs['larger_group_label'] = max(group_labels, key=lambda x: len([sample for sample, label in sample_label_dict.items() if label == x]))
+  print('kwargs passed:' + str(kwargs))
+
+  if 'classification_method_parameters' in kwargs:
+      classification_method_parameters = kwargs['classification_method_parameters']
+      classification_model = classification_method(**classification_method_parameters)
+  else:
+      classification_model = classification_method()
+
+  if 'feature_ranking_method' in kwargs and 'estimator_for_rfe_ranking' not in kwargs:
+    if kwargs['feature_ranking_method'].__name__ == 'perform_RFE_ranking':
+      kwargs['estimator_for_rfe_ranking'] = sklearn.base.clone(classification_model)
+
+  if 'classifier_for_feature_selection' not in kwargs:
+    kwargs['classifier_for_feature_selection'] = sklearn.base.clone(classification_model)
+
+  start_time = time.time()
+  results_df = run_pipeline_across_folds(df, sample_label_dict=sample_label_dict, train_folds_df=train_folds_df, test_folds_df=test_folds_df,
+                                         info_df=info_df, fold_indices=fold_indices, pre_processing_methods=pre_processing_methods,
+                                         feature_selection_method=feature_selection_method, classification_model=classification_model, **kwargs)
+  end_time = time.time()
+  print(f'Pipeline finished in {end_time - start_time} seconds')
+
+  if existing_results_df is not None:
+    results_df = pd.concat([existing_results_df, results_df], axis=0)
+    results_df = results_df[~results_df.index.duplicated(keep='last')]
+
+  return results_df
 
 
 
