@@ -130,7 +130,6 @@ def run_pipeline_across_folds(df, sample_label_dict, train_folds_df, test_folds_
 def prepare_and_run_pipeline_on_folds(df, fold_path, experiment_name, sample_label_dict, pre_processing_methods, feature_selection_method, classification_method, fold_indices = None, existing_results_df = None, **kwargs):
   
   df = df.copy()
-  info_df = pd.read_csv(fold_path + 'info_df_' + f'{experiment_name}.csv', index_col = 0)
   train_folds_df = pd.read_csv(fold_path + 'train_folds_' + f'{experiment_name}.csv', index_col = 0)
   test_folds_df = pd.read_csv(fold_path + 'test_folds_' + f'{experiment_name}.csv', index_col = 0)
   group_labels = [label for label in list(set(sample_label_dict.values())) if label != 'unused']
@@ -189,7 +188,10 @@ def run_pipeline_on_loocv_folds(df, sample_label_dict, train_folds_df, test_fold
                                                             pre_processing_methods=pre_processing_methods, feature_selection_method=feature_selection_method,
                                                             classification_model=classification_model, **kwargs)
     for result in results_for_single_fold:
-      loocv_results_df.loc[testing_sample, result] = results_for_single_fold[result]
+      try:
+        loocv_results_df.loc[testing_sample, result] = results_for_single_fold[result]
+      except Exception as e:
+        loocv_results_df.loc[testing_sample, result] = str(results_for_single_fold[result])
 
   return loocv_results_df
 
