@@ -56,28 +56,42 @@ def run_pipeline_for_single_fold(X_train, y_train, X_test, y_test, pre_processin
     prob_1 = classification_model.predict_proba(X_test)[:,1]
   except Exception as e:
     print(e)
-    print('proba attribute is not defined, calcualting decision function')
+    print('proba attribute is not defined, calculating decision function')
     dec = classification_model.decision_function(X_test)
     full_dec = classification_model.decision_function(pd.concat([X_train, X_test]))
-    prob_1 = (dec - full_dec.min() + 1e-6) / (full_dec.max() - full_dec.min() + 1e-5)
+    prob_1 = (dec - full_dec.min() + 1e-7) / (full_dec.max() - full_dec.min() + 1e-5)
 
   #get number of features used
   try:
-    number_of_features_used = sum(abs(classification_model.coef_[0]) > 0)
+    feature_importances = classification_model.coef_[0]
   except:
-    number_of_features_used = len(selected_features)
+    try:
+      feature_importances = classification_model.feature_importances_
+    except:
+      feature_importances = np.ones(len(selected_features))
+  number_of_features_used = np.sum(abs(feature_importances) > 0)
 
 
-  results_dict = {'prediction' : predictions,
-                  'prob_class_1' : prob_1,
-                  'true label' : y_test,
-                  'number_of_features_used' : number_of_features_used}
+  results_dict = {
+    'sample' : X_test.index.to_list(),
+    'prediction' : predictions,
+    'prob_class_1' : prob_1,
+    'true label' : y_test,
+    'number_of_features_used' : number_of_features_used
+  }
+
+  if number_of_features_used <= 20:
+    #save non-zero importance features
+    results_dict['features_used'] = selected_features[abs(feature_importances) > 0].to_list()
+    results_dict['feature_importances'] = feature_importances[abs(feature_importances) > 0].to_list()
 
   print('results for samples' + str(X_test.index.to_list()))
   print(results_dict)
 
 
   return results_dict
+
+
 
 def run_pipeline_on_loocv_folds(df, sample_label_dict, train_folds_df, test_folds_df, info_df, loocv_fold_indices,  pre_processing_methods, feature_selection_method, classification_model, **kwargs):
 
