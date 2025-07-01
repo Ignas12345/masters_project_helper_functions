@@ -1,3 +1,5 @@
+import time
+
 import sklearn.base
 from sklearn._config import set_config
 import pandas as pd
@@ -193,10 +195,14 @@ def run_pipeline_on_loocv_folds_and_record_performance(df, fold_path, experiment
     perform_pca(df, sample_label_dict = sample_label_dict, pre_processing_methods = pre_processing_methods, label_dict_for_plotting = None, samples_to_use = None,
                                  title = f'PCA for {experiment_name} with {utils.map_items_to_names(pre_processing_methods)}', **kwargs)
 
+  start_time = time.time()
   loocv_results = run_pipeline_on_loocv_folds(df, sample_label_dict=sample_label_dict, train_folds_df=train_folds_df, test_folds_df=test_folds_df,
                                          info_df= info_df, loocv_fold_indices=loocv_fold_indices, pre_processing_methods = pre_processing_methods,
                                          feature_selection_method = feature_selection_method, classification_model = classification_model, **kwargs)
-
+  end_time = time.time()
+  print(f'LOOCV pipeline finished in {end_time - start_time} seconds')
+  kwargs['time_taken'] = end_time - start_time
+  
   methods_used = {**pre_processing_methods, 'feature_selection_method' : feature_selection_method, 'classification_method' : classification_method, **kwargs}
   method_names = utils.map_items_to_names(methods_used)
   loocv_metrics_row = calculate_loocv_metrics(loocv_results, experiment_name = experiment_name, **method_names)
