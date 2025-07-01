@@ -80,14 +80,16 @@ def run_pipeline_for_single_fold(X_train, y_train, X_test, y_test, pre_processin
     'number_of_features_used' : number_of_features_used
   }
 
+  print('results for samples' + str(X_test.index.to_list()))
+  print(results_dict)
+
   if number_of_features_used <= 20:
     #save non-zero importance features
     mask = np.abs(feature_importances) > 0
     results_dict['features_used'] = [f for f, m in zip(selected_features, mask) if m]
     results_dict['feature_importances'] = [imp for imp, m in zip(feature_importances, mask) if m]
+    print('feature importances: ' + str(results_dict['feature_importances']))
 
-  print('results for samples' + str(X_test.index.to_list()))
-  print(results_dict)
 
 
   return results_dict
