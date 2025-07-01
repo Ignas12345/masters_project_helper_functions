@@ -92,9 +92,13 @@ def run_pipeline_for_single_fold(X_train, y_train, X_test, y_test, pre_processin
 
   return results_dict
 
-def run_pipeline_across_folds(df, sample_label_dict, train_folds_df, test_folds_df, info_df, fold_indices, pre_processing_methods, feature_selection_method, classification_model, autosave = True, save_path = '', **kwargs):
+def run_pipeline_across_folds(df, sample_label_dict, train_folds_df, test_folds_df, pre_processing_methods, feature_selection_method, classification_model, fold_indices = None, autosave = True, save_path = '', **kwargs):
 
   results = []
+  if fold_indices is None:
+    fold_indices = range(1, len(train_folds_df))
+  elif isinstance(fold_indices, int):
+    fold_indices = range(fold_indices, len(train_folds_df))
 
   for fold_index in fold_indices:
     print(f'Fold {fold_index}')
@@ -123,7 +127,7 @@ def run_pipeline_across_folds(df, sample_label_dict, train_folds_df, test_folds_
 
   return results_df
 
-def prepare_and_run_pipeline_on_folds(df, fold_path, fold_indices, experiment_name, sample_label_dict, pre_processing_methods, feature_selection_method, classification_method, existing_results_df = None, **kwargs):
+def prepare_and_run_pipeline_on_folds(df, fold_path, experiment_name, sample_label_dict, pre_processing_methods, feature_selection_method, classification_method, fold_indices = None, existing_results_df = None, **kwargs):
   
   df = df.copy()
   info_df = pd.read_csv(fold_path + 'info_df_' + f'{experiment_name}.csv', index_col = 0)
@@ -148,8 +152,7 @@ def prepare_and_run_pipeline_on_folds(df, fold_path, fold_indices, experiment_na
     kwargs['classifier_for_feature_selection'] = sklearn.base.clone(classification_model)
 
   start_time = time.time()
-  results_df = run_pipeline_across_folds(df, sample_label_dict=sample_label_dict, train_folds_df=train_folds_df, test_folds_df=test_folds_df,
-                                         info_df=info_df, fold_indices=fold_indices, pre_processing_methods=pre_processing_methods,
+  results_df = run_pipeline_across_folds(df, sample_label_dict=sample_label_dict, train_folds_df=train_folds_df, test_folds_df=test_folds_df, fold_indices=fold_indices, pre_processing_methods=pre_processing_methods,
                                          feature_selection_method=feature_selection_method, classification_model=classification_model, **kwargs)
   end_time = time.time()
   print(f'Pipeline finished in {end_time - start_time} seconds')
