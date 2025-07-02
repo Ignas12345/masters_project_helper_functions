@@ -94,7 +94,14 @@ def run_pipeline_for_single_fold(X_train, y_train, X_test, y_test, pre_processin
 
 def run_pipeline_across_folds(df, sample_label_dict, train_folds_df, test_folds_df, pre_processing_methods, feature_selection_method, classification_model, fold_indices = None, autosave = True, save_path = '', **kwargs):
 
-  results = []
+  if autosave:
+    try:
+      results_df = pd.read_csv(save_path + 'results_df_autosave.csv', sep = ';', index_col = 0)
+      print('Found existing results_df_autosave.csv, appending to it')
+    except FileNotFoundError:
+      print('No existing results_df_autosave.csv found, creating a new one')
+      results_df = pd.DataFrame()
+ 
   if fold_indices is None:
     fold_indices = range(1, len(train_folds_df))
   elif isinstance(fold_indices, int):
@@ -119,9 +126,9 @@ def run_pipeline_across_folds(df, sample_label_dict, train_folds_df, test_folds_
     results_for_single_fold = run_pipeline_for_single_fold(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test,
                                                             pre_processing_methods=pre_processing_methods, feature_selection_method=feature_selection_method,
                                                             classification_model=classification_model, **kwargs)
-    results.append(results_for_single_fold)
-    results_df  = pd.DataFrame(results)
-    
+    results_for_single_fold = pd.DataFrame(results_for_single_fold)
+    results_df.loc[fold_index] = results_for_single_fold
+
     if autosave:
       results_df.to_csv(save_path + 'results_df_autosave.csv', sep = ';')
 
