@@ -293,8 +293,16 @@ def perform_RFE_ranking(df_to_use, class1_samples , class2_samples, estimator_fo
     
     estimator_for_rfe_ranking = sklearn.base.clone(estimator_for_rfe_ranking)
 
-    y = np.array([1] * len(class1_samples) + [0] * len(class2_samples))
-    X = df_to_use.loc[class1_samples + class2_samples].copy()
+    X = df_to_use.copy()
+    y = []
+    for sample in X.index:
+      if sample in class1_samples:
+        y.append(1)
+      elif sample in class2_samples:
+        y.append(0)
+      else:
+        raise ValueError('Sample not in class1_samples or class2_samples')
+      
     # Ensure the estimator is fitted on the combined data
     rfe = RFE(estimator=estimator_for_rfe_ranking, n_features_to_select=1, step=step_size_for_rfe_ranking)
     print('Performing RFE ranking with estimator: ', estimator_for_rfe_ranking.__class__.__name__)
