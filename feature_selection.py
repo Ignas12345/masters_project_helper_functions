@@ -63,6 +63,7 @@ def forward_feature_selection_cv(X_cv, y_cv, classifier, max_features=10, allow_
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
 
     print("Starting forward feature selection with cross-validation...")
+    print("Using estimator: ", classifier.__class__.__name__)
 
     rounds_without_improvement = 0
 
@@ -161,6 +162,7 @@ def forward_feature_selection_cv_without_evaluation_on_train_set(X_cv, y_cv, cla
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
 
     print("Starting forward feature selection with cross-validation...")
+    print("Using estimator: ", classifier.__class__.__name__)
 
     # Loop until we've reached the maximum allowed features or no more remain
     while remaining_features and (len(current_features) < max_features):
@@ -271,6 +273,8 @@ def rfecv_feature_selection(X_cv, y_cv, classifier, max_features=10, n_splits=5,
     """
     # Ensure the classifier is cloned to avoid modifying the original instance
     classifier = clone(classifier)
+    print("Running RFE with CV feature selection...")
+    print("Using estimator: ", classifier.__class__.__name__)
     rfecv = RFECV(
         estimator=classifier,
         step=1,
