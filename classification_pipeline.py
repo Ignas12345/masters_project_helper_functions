@@ -100,7 +100,7 @@ def run_pipeline_across_folds(df, sample_label_dict, train_folds_df, test_folds_
       print('Found existing results_df_autosave.csv, appending to it')
     except FileNotFoundError:
       print('No existing results_df_autosave.csv found, creating a new one')
-      results_df = pd.DataFrame()
+      results_df = pd.DataFrame(columns=['sample', 'prediction', 'prob_class_1', 'true label', 'number_of_features_used', 'features_used', 'feature_importances'])
  
   if fold_indices is None:
     fold_indices = range(1, len(train_folds_df))
