@@ -6,6 +6,11 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import ast
+from IPython.display import display
+
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, recall_score, precision_score, brier_score_loss, matthews_corrcoef
+import warnings
+from sklearn.exceptions import UndefinedMetricWarning
 
 '''
 Functions that get frequencies and weights of features selected in each fold:
@@ -122,7 +127,7 @@ def get_frequency_array(frequency_matrix, fold_indices = None, normalize = False
   '''
   Functions for clustering mirnas together based on the miRCarta database:
   '''
-  def return_neighborhood_mirnas(mirna_name, cluster_df, mirnas_to_use = None):
+def return_neighborhood_mirnas(mirna_name, cluster_df, mirnas_to_use = None):
   if mirnas_to_use is not None:
     mirna_cluster_df = cluster_df.loc[mirnas_to_use].copy()
   else:
@@ -336,3 +341,236 @@ def build_feature_graph(A_adj: pd.DataFrame,
     plt.show()
 
     return G_full, G_display, id_map
+
+'''wrapper functions that display/save the results:'''
+
+def inspect_weight_array(weight_array, threshold = 0.9):
+  weight_array = weight_array.copy()
+  #plot cumsum of weight_array
+  x_values = range(1, len(weight_array) + 1)
+  y_values = weight_array.cumsum()
+  plt.plot(x_values, y_values)
+  plt.xlabel('Number of features')
+  plt.ylabel('Cumulative weight')
+  idx = np.where(y_values >= threshold)[0][0]
+  print('Takes ' + str(idx+1) + f' features/neighborhoods to reach cumsum of {threshold} in weight array')
+  #move index to column feature name:
+  weight_array = weight_array.reset_index()
+  #weight_array.index = weight_array.index + 1
+  weight_array.columns = ['feature', 'weight']
+  print(weight_array.iloc[:(idx+1)])
+  '''
+  for i in range(0, 35, 3):
+    if i < len(weight_array):
+      print(f'cumsum of {i+1} features: ', y_values[i])
+  '''
+  return (idx+1)
+
+def inspect_neighborhoods(features, neighborhood_df, expression_df, weight_array, save_to_latex = True, file_name = None):
+  expression_df = expression_df.copy()
+  neighborhood_df = neighborhood_df.copy()
+  weight_array = weight_array.copy()
+
+  for feature in features:
+    #check if feature name ends in 'neighborhood'
+    if feature.endswith(' neighborhood'):
+      print(f'{feature} consists of : ')
+      feature = feature[:-13]
+      neighborhood = return_neighborhood_mirnas(feature, neighborhood_df, weight_array.index)
+      print(neighborhood)
+
+      corr_df = pd.DataFrame(index = ['avg. weight', 'avg. expression', 'margin', 'corr. with representative'], columns =[feature,])
+      corr_df.loc['avg. weight', feature] = weight_array[feature].copy()
+      corr_df.loc['avg. expression', feature] = expression_df[feature].mean()
+      corr_df.loc['margin', feature] = expression_df[feature].max() - expression_df[feature].min()
+      #corr_df.loc['avg. weight diff.', feature] = weight_array[feature] - weight_array[feature]
+      corr_df.loc['corr. with representative', feature] = spearmanr(expression_df[feature], expression_df[feature]).correlation
+      for nb in neighborhood:
+        if nb != feature:
+          corr_df.loc['avg. weight', nb] = weight_array.loc[nb].copy()
+          corr_df.loc['avg. expression', nb] = expression_df[nb].mean()
+          corr_df.loc['margin', nb] = expression_df[nb].max() - expression_df[nb].min()
+          #corr_df.loc['avg. weight diff.', nb] = weight_array.loc[nb] - weight_array.loc[feature]
+          corr_df.loc['corr. with representative', nb] = spearmanr(expression_df[feature], expression_df[nb]).correlation
+      display(corr_df)
+      if save_to_latex:
+        if file_name is None:
+          raise ValueError('file_name must be provided if save_to_latex is True')
+        corr_df.to_latex(f'{file_name}_{feature}_neighborhood_table.tex')
+      print('\n')
+
+def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use_aggregated_results = False, inspect_agg_neighborhoods = False, expression_df = 'None', save_to_latex = True, save_to_csv = True, file_name = None):
+
+  if save_to_latex or save_to_csv:
+    if file_name is None:
+      raise ValueError('file_name must be provided if save_to_latex or save_to_csv is True')
+
+  if fold_indices is not None:
+    result_df = result_df.loc[fold_indices].copy()
+  else:
+    result_df = result_df.copy()
+  freq_matrix =  get_feature_frequency_matrix(result_df)
+  freq_array = get_frequency_array(freq_matrix, normalize=False)
+  weight_matrix = get_feature_weight_matrix(result_df)
+  weight_array = get_average_weight_array(weight_matrix, normalize=True)
+  unnormalized_weight_array = get_average_weight_array(weight_matrix, normalize=False)
+
+  if use_aggregated_results:
+    if mirna_cluster_df is None:
+      raise ValueError('mirna_cluster_df must be provided if use_aggregated_results is True')
+    freq_matrix = get_aggregated_by_neighbors_weight_matrix(freq_matrix, freq_array, mirna_cluster_df)
+    freq_array = get_frequency_array(freq_matrix, normalize=False)
+    weight_matrix = get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna_cluster_df)
+    orig_weight_array = weight_array.copy()
+    weight_array = get_average_weight_array(weight_matrix, normalize=True)
+    unnormalized_weight_array = get_average_weight_array(weight_matrix, normalize=False)
+
+
+  k = inspect_weight_array(weight_array, threshold = 0.9)
+  top_k_features = weight_array.iloc[:k].index
+  cumsum_of_top_k_features = weight_array[top_k_features].sum()
+  print(f'cumsum of top {k} features: ' + str(cumsum_of_top_k_features))
+
+  print('Frequency array: ')
+  display(freq_array.iloc[:])
+
+  print('Normalized weight array: ')
+  display(weight_array.iloc[:k])
+
+  print('Unnormalized weight array: ')
+  display(unnormalized_weight_array.iloc[:k])
+
+  A_adj = construct_adj_matrix_from_weight_matrix(weight_matrix, features_to_use=top_k_features)
+  W = weight_array[top_k_features]
+
+  build_feature_graph(A_adj, W, top_k_edges=10)
+  #convert W to df with one column 'avg. normalized weight':
+  final_feat_df = pd.DataFrame(index = top_k_features)
+  final_feat_df['frequency'] = freq_array[top_k_features]
+  final_feat_df['avg. norm. weight given appearance'] = weight_array[top_k_features]/freq_array[top_k_features]
+  final_feat_df['avg. weight given appearance'] = unnormalized_weight_array[top_k_features]/freq_array[top_k_features]
+  final_feat_df = final_feat_df.reset_index()
+  final_feat_df.index +=1
+  display(final_feat_df)
+  print('\n')
+  print("Adjacency matrix for graph: ")
+  display(A_adj)
+
+  if save_to_latex:
+    freq_array.to_latex(f'{file_name}_freq_array_table.tex')
+    weight_array.to_latex(f'{file_name}_weight_array_table.tex')
+    unnormalized_weight_array.to_latex(f'{file_name}_unnormalized_weight_array_table.tex')
+    final_feat_df.to_latex(f'{file_name}_final_features_table.tex')
+  if save_to_csv:
+    freq_array.to_csv(f'{file_name}_freq_array.csv', sep = ';')
+    weight_array.to_csv(f'{file_name}_weight_array.csv', sep = ';')
+    unnormalized_weight_array.to_csv(f'{file_name}_unnormalized_weight_array.csv', sep = ';')
+    final_feat_df.to_csv(f'{file_name}_final_features.csv', sep = ';')
+
+  if inspect_agg_neighborhoods and use_aggregated_results:
+    if expression_df is None:
+      raise ValueError('expression_df must be provided if inspect_agg_neighborhoods is True')
+    inspect_neighborhoods(top_k_features, mirna_cluster_df, expression_df, orig_weight_array, save_to_latex=save_to_latex, file_name=file_name)
+
+metrics_dict = {
+    'Accuracy' : accuracy_score,
+    'Balanced accuracy' : balanced_accuracy_score,
+    'Recall' : recall_score,
+    'Precision' : precision_score,
+    'MCC' : matthews_corrcoef,
+    'Brier loss' : brier_score_loss
+}
+
+def calculate_metrics_for_loocv_folds(results_df, fold_indices, metrics_dict):
+  results_df = results_df.loc[fold_indices].copy()
+  metrics_df = pd.DataFrame(index = results_df.index, columns = metrics_dict.keys())
+  y_test = []
+  y_proba = []
+  y_pred = []
+  for row in results_df.index:
+    y_test.append(parse_space_separated_list(results_df.loc[row, 'true label']))
+    y_proba.append(parse_space_separated_list(results_df.loc[row, 'prob_class_1']))
+    y_pred.append(parse_space_separated_list(results_df.loc[row, 'prediction']))
+
+  for metric in metrics_dict.keys():
+      if metric == 'brier_score_loss':
+        metrics_df.loc[row, metric] = metrics_dict[metric](y_test, y_proba)
+      else:
+        metrics_df.loc[row, metric] = metrics_dict[metric](y_test, y_pred)
+  return metrics_df
+
+
+
+def calculate_metrics_for_non_loocv_folds(results_df, fold_indices, metrics_dict):
+  if fold_indices is not None:
+    results_df = results_df.loc[fold_indices].copy()
+  else:
+    results_df = results_df.copy()
+  metrics_df = pd.DataFrame(index = results_df.index, columns = metrics_dict.keys())
+  for row in results_df.index:
+    y_test = parse_space_separated_list(results_df.loc[row, 'true label'])
+    y_proba = parse_space_separated_list(results_df.loc[row, 'prob_class_1'])
+    y_pred = parse_space_separated_list(results_df.loc[row, 'prediction'])
+    try:
+      for metric in metrics_dict.keys():
+        if metric == 'brier_score_loss':
+          metrics_df.loc[row, metric] = metrics_dict[metric](y_test, y_proba)
+        else:
+          metrics_df.loc[row, metric] = metrics_dict[metric](y_test, y_pred)
+    except Exception as e:
+      print(f"Error in row {row}: {e}")
+      continue
+  return metrics_df
+
+def get_fold_metrics(results_df, train_folds_df, metrics_dict, percentile_for_conf_int = 0.95, save_to_latex = True, file_name = None):
+  alpha = 1 - percentile_for_conf_int
+
+  # We'll build a list of Series (one per comment), then concat them into one DataFrame
+  summary_series = []
+
+  for comment in train_folds_df['comment'].unique():
+      if comment == 'all training samples':
+          continue
+      print(comment)
+      # get your fold indices and metrics
+      fold_indices = utils.get_folds_by_comment(train_folds_df, comment)
+      if comment == 'loocv fold':
+          metrics_df = calculate_metrics_for_loocv_folds(results_df, fold_indices=fold_indices, metrics_dict=metrics_dict)
+      else:
+          metrics_df = calculate_metrics_for_non_loocv_folds(results_df, fold_indices=fold_indices, metrics_dict=metrics_dict)
+
+      # compute mean and CI bounds
+      mean_vals  = metrics_df.mean()
+      lower_vals = metrics_df.quantile(alpha/2)
+      upper_vals = metrics_df.quantile(1 - alpha/2)
+
+      # format each metric as "mean; CI: [lower, upper]"
+      if comment == 'loocv fold':
+        formatted = formatted = mean_vals.index.to_series().apply(
+          lambda metric: (
+             f"{(100*mean_vals[metric]):.1f}"
+                if metric != 'Brier loss'
+                else f"{(mean_vals[metric]):.3f}"
+                ))
+      else:
+        formatted = mean_vals.index.to_series().apply(
+            lambda metric: (
+                 f"{(100*mean_vals[metric]):.1f} CI:[{100*lower_vals[metric]:.1f}, {100*upper_vals[metric]:.1f}]"
+                if metric != 'Brier loss'
+                else f"{(mean_vals[metric]):.3f} CI:[{lower_vals[metric]:.3f}, {upper_vals[metric]:.3f}]"
+                ))
+
+      # name this Series by the comment, so concat will make it a column
+      formatted.name = comment + 's'
+      summary_series.append(formatted)
+
+  # put them all side by side
+  summary_df = pd.concat(summary_series, axis=1)
+
+  # now summary_df.index are your metric names, columns are each comment
+  display(summary_df)
+  if save_to_latex:
+    if file_name is None:
+      raise ValueError('file_name must be provided if save_to_latex is True')
+    summary_df.to_latex(f'{file_name}_metrics_summary_table_with_{percentile_for_conf_int}_conf_ints.tex')
+  return summary_df

@@ -434,4 +434,163 @@ def plot_two_features_use_text(df_1, feature_1, feature_2, df_2 = None, use_numb
 
   plt.show()
 
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
+def plot_feature_scatter_3D(
+    X: pd.DataFrame,
+    sample_label_dict: dict,
+    features: list,
+    teratoma_burden_df: pd.DataFrame = None,
+    teratoma_col_name: str = 'total_teratoma_burden',
+    refine_labels: bool = False,
+    plot_ter_burden: bool = True,
+    continuous_color_scale: str = 'plasma',
+    width: int = 1000,
+    height: int = 1000,
+    dot_size = 10,
+    title: str = None
+):
+    """
+    Plot a 1D, 2D, or 3D scatter using Plotly, with discrete non-TGCT groups and continuous TGCT burden.
+    """
+    assert 1 <= len(features) <= 3, "Number of features must be 1, 2, or 3"
+
+    # Prepare data
+    df = X.copy()
+    df['label'] = df.index.map(sample_label_dict)
+    df['sample_id'] = df.index
+
+    # Refine labels
+    if refine_labels:
+        def refine_label(row):
+            if row['label'] == 'TGCT': return 'TGCT'
+            if row['sample_id'].startswith('GTEX'): return 'GTEx'
+            return 'other TCGA studies'
+        df['refined_label'] = df.apply(refine_label, axis=1)
+        df_other = df[df['refined_label'] != 'TGCT']
+        if plot_ter_burden:
+          if teratoma_burden_df is None:
+              raise ValueError("teratoma_burden_df required when refine_labels=True")
+          df_tgct = df[df['refined_label'] == 'TGCT'].merge(teratoma_burden_df, on='sample_id', how='left')
+        else:
+          df_tgct = pd.DataFrame()
+        discrete_map = {'GTEx': 'blue', 'other TCGA studies': 'red'}
+    else:
+        df['refined_label'] = df['label']
+        df_other = df.copy()
+        df_tgct = pd.DataFrame(columns=df.columns)
+        labels = df_other['refined_label'].unique().tolist()
+        if len(labels) == 3:
+            discrete_map = {labels[0]: 'red', labels[1]: 'blue', labels[2]: 'orange'}
+        elif len(labels) == 2:
+            discrete_map = {labels[0]: 'red', labels[1]: 'blue'}
+        else:
+            discrete_map = {labels[0]: 'red'}
+        if plot_ter_burden:
+          if teratoma_burden_df is None:
+              raise ValueError("teratoma_burden_df required when refine_labels=False")
+          df_tgct = df_other.merge(teratoma_burden_df, on='sample_id', how='left')
+        else:
+          df_tgct = pd.DataFrame()
+
+    # Start figure
+    fig = go.Figure()
+
+    # Discrete scatter (non-TGCT)
+    if len(features) == 1:
+        scatter_d = px.scatter(
+            df_other,
+            x=features[0], y=[0]*len(df_other),
+            color='refined_label',
+            color_discrete_map=discrete_map,
+            hover_name='sample_id',
+            title=title
+        )
+    elif len(features) == 2:
+        scatter_d = px.scatter(
+            df_other,
+            x=features[0], y=features[1],
+            color='refined_label',
+            color_discrete_map=discrete_map,
+            hover_name='sample_id',
+            title=title
+        )
+    else:
+        scatter_d = px.scatter_3d(
+            df_other,
+            x=features[0], y=features[1], z=features[2],
+            color='refined_label',
+            color_discrete_map=discrete_map,
+            hover_name='sample_id',
+            title=title
+        )
+    for tr in scatter_d.data:
+        fig.add_trace(tr)
+
+    # Continuous scatter (TGCT)
+    if plot_ter_burden and not df_tgct.empty:
+        if len(features) == 1:
+            scatter_c = px.scatter(
+                df_tgct,
+                x=features[0], y=[0]*len(df_tgct),
+                color=teratoma_col_name,
+                color_continuous_scale=continuous_color_scale,
+                hover_name='sample_id',
+                title=title
+            )
+        elif len(features) == 2:
+            scatter_c = px.scatter(
+                df_tgct,
+                x=features[0], y=features[1],
+                color=teratoma_col_name,
+                color_continuous_scale=continuous_color_scale,
+                hover_name='sample_id',
+                title=title
+            )
+        else:
+            scatter_c = px.scatter_3d(
+                df_tgct,
+                x=features[0], y=features[1], z=features[2],
+                color=teratoma_col_name,
+                color_continuous_scale=continuous_color_scale,
+                hover_name='sample_id',
+                title=title
+            )
+        for tr in scatter_c.data:
+            tr.showlegend = False
+            # assign to common coloraxis
+            tr.marker.coloraxis = 'coloraxis'
+            fig.add_trace(tr)
+
+    # Layout: size, legend, axis titles, coloraxis
+    layout = dict(
+        width=width,
+        height=height,
+        legend=dict(title='Groups', yanchor='top', y=0.99, xanchor='right', x=-0.1)
+    )
+    # axis titles
+    if len(features) == 1:
+        layout.update(xaxis_title=features[0], yaxis_title='')
+    elif len(features) == 2:
+        layout.update(xaxis_title=features[0], yaxis_title=features[1])
+    else:
+        layout['scene'] = dict(
+            xaxis_title=features[0],
+            yaxis_title=features[1],
+            zaxis_title=features[2]
+        )
+    # continuous colorbar
+    if plot_ter_burden and not df_tgct.empty:
+        layout['coloraxis'] = dict(
+            colorscale=continuous_color_scale,
+            colorbar=dict(title=f"TGCT: {teratoma_col_name}")
+        )
+
+    fig.update_layout(**layout)
+    fig.update_traces(marker=dict(size=dot_size))
+
+    return fig
+
   

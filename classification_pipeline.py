@@ -14,6 +14,17 @@ import plotting
 
 set_config(transform_output='pandas')
 
+def get_kwargs(sample_label_dict, kwargs = None):
+  '''helper function when we only want to do pre-processing and not run the whole pipeline.'''
+  if kwargs is None:
+    kwargs = {}
+  group_labels = [label for label in list(set(sample_label_dict.values())) if label != 'unused']
+  kwargs['smaller_group_label'] = min(group_labels, key=lambda x: len([sample for sample, label in sample_label_dict.items() if label == x]))
+  kwargs['larger_group_label'] = max(group_labels, key=lambda x: len([sample for sample, label in sample_label_dict.items() if label == x]))
+  kwargs['class1_samples'] = [sample for sample in sample_label_dict.keys() if sample_label_dict[sample] == kwargs['smaller_group_label']]
+  kwargs['class2_samples'] = [sample for sample in sample_label_dict.keys() if sample_label_dict[sample] == kwargs['larger_group_label']]
+  return kwargs
+
 def run_pre_processing_on_train_set(X_train, pre_processing_methods, **kwargs):
   print('Running pre processing on train set')
   method_training_estimates_dict = {}
