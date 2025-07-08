@@ -121,6 +121,8 @@ def get_frequency_array(frequency_matrix, fold_indices = None, normalize = False
     frequency_array.rename('normalized frequency', inplace=True)
   else:
     frequency_array = frequency_array / len(frequency_matrix)
+    #have at most 1 as frequency
+    frequency_array = frequency_array.clip(upper=1.0)
     frequency_array.rename('frequency', inplace=True)
   return frequency_array.sort_values(ascending=False)
 
