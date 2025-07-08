@@ -487,19 +487,24 @@ def calculate_metrics_for_loocv_folds(results_df, fold_indices, metrics_dict):
   y_test = []
   y_proba = []
   y_pred = []
+  n_features = []
   for row in results_df.index:
     y_test.append(parse_space_separated_list(results_df.loc[row, 'true label']))
     y_proba.append(parse_space_separated_list(results_df.loc[row, 'prob_class_1']))
     y_pred.append(parse_space_separated_list(results_df.loc[row, 'prediction']))
+    n_features.append(len(ast.literal_eval(results_df.loc[row, 'features_used'])))
 
   for metric in metrics_dict.keys():
       if metric == 'brier_score_loss':
-        metrics_df.loc[row, metric] = metrics_dict[metric](y_test, y_proba)
+        metrics_df.loc[:, metric] = metrics_dict[metric](y_test, y_proba)
       else:
-        metrics_df.loc[row, metric] = metrics_dict[metric](y_test, y_pred)
+        metrics_df.loc[:, metric] = metrics_dict[metric](y_test, y_pred)
+  metrics_df['Feature number'] = n_features
+        
   return metrics_df
 
-
+#define Undefined warning as an error:
+warnings.filterwarnings("error", category=UndefinedMetricWarning)
 
 def calculate_metrics_for_non_loocv_folds(results_df, fold_indices, metrics_dict):
   if fold_indices is not None:
@@ -511,6 +516,8 @@ def calculate_metrics_for_non_loocv_folds(results_df, fold_indices, metrics_dict
     y_test = parse_space_separated_list(results_df.loc[row, 'true label'])
     y_proba = parse_space_separated_list(results_df.loc[row, 'prob_class_1'])
     y_pred = parse_space_separated_list(results_df.loc[row, 'prediction'])
+    n_features = len(ast.literal_eval(results_df.loc[row, 'features_used']))
+
     try:
       for metric in metrics_dict.keys():
         if metric == 'brier_score_loss':
@@ -520,9 +527,11 @@ def calculate_metrics_for_non_loocv_folds(results_df, fold_indices, metrics_dict
     except Exception as e:
       print(f"Error in row {row}: {e}")
       continue
+    metrics_df.loc[row, 'Feature number'] = n_features
+
   return metrics_df
 
-def get_fold_metrics(results_df, train_folds_df, metrics_dict, percentile_for_conf_int = 0.95, save_to_latex = True, file_name = None):
+def get_fold_metrics(results_df, train_folds_df, metrics_dict = metrics_dict, percentile_for_conf_int = 0.95, save_to_latex = True, file_name = None):
   alpha = 1 - percentile_for_conf_int
 
   # We'll build a list of Series (one per comment), then concat them into one DataFrame
@@ -546,17 +555,17 @@ def get_fold_metrics(results_df, train_folds_df, metrics_dict, percentile_for_co
 
       # format each metric as "mean; CI: [lower, upper]"
       if comment == 'loocv fold':
-        formatted = formatted = mean_vals.index.to_series().apply(
+        formatted = mean_vals.index.to_series().apply(
           lambda metric: (
              f"{(100*mean_vals[metric]):.1f}"
-                if metric != 'Brier loss'
+                if (metric != 'Brier loss' and metric != 'Feature number')
                 else f"{(mean_vals[metric]):.3f}"
                 ))
       else:
         formatted = mean_vals.index.to_series().apply(
             lambda metric: (
                  f"{(100*mean_vals[metric]):.1f} CI:[{100*lower_vals[metric]:.1f}, {100*upper_vals[metric]:.1f}]"
-                if metric != 'Brier loss'
+                if (metric != 'Brier loss' and metric != 'Feature number')
                 else f"{(mean_vals[metric]):.3f} CI:[{lower_vals[metric]:.3f}, {upper_vals[metric]:.3f}]"
                 ))
 
