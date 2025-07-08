@@ -492,7 +492,7 @@ def calculate_metrics_for_loocv_folds(results_df, fold_indices, metrics_dict):
     y_test.append(parse_space_separated_list(results_df.loc[row, 'true label']))
     y_proba.append(parse_space_separated_list(results_df.loc[row, 'prob_class_1']))
     y_pred.append(parse_space_separated_list(results_df.loc[row, 'prediction']))
-    n_features.append(len(ast.literal_eval(results_df.loc[row, 'features_used'])))
+    n_features.append(results_df.loc[row, 'number_of_features_used'])
 
   for metric in metrics_dict.keys():
       if metric == 'brier_score_loss':
@@ -516,7 +516,7 @@ def calculate_metrics_for_non_loocv_folds(results_df, fold_indices, metrics_dict
     y_test = parse_space_separated_list(results_df.loc[row, 'true label'])
     y_proba = parse_space_separated_list(results_df.loc[row, 'prob_class_1'])
     y_pred = parse_space_separated_list(results_df.loc[row, 'prediction'])
-    n_features = len(ast.literal_eval(results_df.loc[row, 'features_used']))
+    n_features = results_df.loc[row, 'number_of_features_used']
 
     try:
       for metric in metrics_dict.keys():
