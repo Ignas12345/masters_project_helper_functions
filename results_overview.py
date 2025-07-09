@@ -181,13 +181,14 @@ def get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna
   if return_freq_matrix:
     #create a frequency matrix for the aggregated weight matrix
     freq_matrix = pd.DataFrame(0, index=aggregated_weight_matrix.index, columns=aggregated_weight_matrix.columns)
-    for idx in weight_matrix.index:
-      for col in weight_matrix.columns:
-        if weight_matrix.loc[idx, col] != 0:
+    for idx in aggregated_weight_matrix.index:
+      for col in aggregated_weight_matrix.columns:
+        if aggregated_weight_matrix.loc[idx, col] != 0:
           freq_matrix.loc[idx, col] = 1
+    print(freq_matrix.sum(axis=0))
     return aggregated_weight_matrix, freq_matrix
-  
-  return aggregated_weight_matrix
+  else:
+    return aggregated_weight_matrix
 
 #Functions for creating a graph and plotting the results:
 
@@ -414,6 +415,7 @@ def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use
     orig_weight_array = weight_array.copy()
     orig_freq_array = freq_array.copy()
     weight_matrix, freq_matrix = get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna_cluster_df, return_freq_matrix=True)
+
     freq_array = get_frequency_array(freq_matrix, normalize=False)
     weight_array = get_average_weight_array(weight_matrix, normalize=True)
     unnormalized_weight_array = get_average_weight_array(weight_matrix, normalize=False)
