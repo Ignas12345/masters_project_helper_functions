@@ -456,10 +456,10 @@ def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use
   display(A_adj)
 
   if save_to_latex:
-    freq_array.to_latex(f'{file_name}_freq_array_table.tex')
-    weight_array.to_latex(f'{file_name}_weight_array_table.tex')
-    unnormalized_weight_array.to_latex(f'{file_name}_unnormalized_weight_array_table.tex')
-    final_feat_df.to_latex(f'{file_name}_final_features_table.tex')
+    freq_array.to_latex(f'{file_name}_freq_array_table.tex', float_format= "%.2f")
+    weight_array.to_latex(f'{file_name}_weight_array_table.tex', float_format= "%.2f")
+    unnormalized_weight_array.to_latex(f'{file_name}_unnormalized_weight_array_table.tex', float_format= "%.2f")
+    final_feat_df.to_latex(f'{file_name}_final_features_table.tex', float_format= "%.2f")
   if save_to_csv:
     freq_array.to_csv(f'{file_name}_freq_array.csv', sep = ';')
     weight_array.to_csv(f'{file_name}_weight_array.csv', sep = ';')
