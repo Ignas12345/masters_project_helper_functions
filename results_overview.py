@@ -380,7 +380,7 @@ def inspect_neighborhoods(features, neighborhood_df, expression_df, freq_array, 
       if save_to_latex:
         if file_name is None:
           raise ValueError('file_name must be provided if save_to_latex is True')
-        corr_df.to_latex(f'{file_name}_{feature}_neighborhood_table.tex')
+        corr_df.to_latex(f'{file_name}_{feature}_neighborhood_table.tex', float_format= "%.2f")
       print('\n')
 
 def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use_aggregated_results = False, inspect_agg_neighborhoods = False, expression_df = 'None', save_to_latex = True, save_to_csv = True, file_name = None):
