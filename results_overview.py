@@ -191,6 +191,21 @@ def get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna
     return aggregated_weight_matrix
 
 #Functions for creating a graph and plotting the results:
+def construct_adj_matrix_from_freq_matrix(freq_matrix, features_to_use = None):
+  #construct an undirected adjacency matrix from the frequency matrix where A[i, j] = number of folds where both i and j were selected / by total number of folds
+  if features_to_use is not None:
+    freq_matrix = freq_matrix[features_to_use]
+  features = freq_matrix.columns
+  adj = pd.DataFrame(0.0, index=features, columns=features)
+  for i in features:
+    for j in features:
+      if i != j:
+        # Select rows where both feature i and j were selected (non-zero frequency)
+        rows_with_i_and_j = freq_matrix[(freq_matrix[i] == 1) & (freq_matrix[j] == 1)]
+        # Calculate the proportion of such rows
+        adj.loc[i, j] = len(rows_with_i_and_j)
+  adj = adj/len(freq_matrix) # Normalize by total number of folds
+  return adj
 
 def construct_adj_matrix_from_weight_matrix(weight_matrix, features_to_use = None):
     weight_matrix = normalize_weight_matrix(weight_matrix)
@@ -209,9 +224,67 @@ def construct_adj_matrix_from_weight_matrix(weight_matrix, features_to_use = Non
       adj.loc[i, :] = rows_with_i.sum(axis=0) / len(rows_with_i)
     return adj
 
-def build_feature_graph(A_adj: pd.DataFrame,
+def build_feature_graph_based_on_freq_adj(A: pd.DataFrame,
                         W: pd.Series,
-                        top_k_edges: int = 50,
+                        threshold_to_keep_edge: float = 0.1,
+                        seed: int = 42):
+    
+
+
+    # Numeric node labels
+    id_map = {feat: idx+1 for idx, feat in enumerate(W.index)}
+    feats = W.index.tolist()
+
+    G = nx.Graph()
+    for feat, node_id in id_map.items():
+        G.add_node(node_id, avg_weight=abs(W[feat]))
+
+    # Add edges: only one per pair (i<j)
+    for i, feat_i in enumerate(feats):
+        for feat_j in feats[i+1:]:
+            w_ij = A.loc[feat_i, feat_j]
+            if w_ij != 0 and abs(w_ij) >= threshold_to_keep_edge:
+                u = id_map[feat_i]
+                v = id_map[feat_j]
+                G.add_edge(u, v, strength=w_ij)
+
+    # Compute layout
+    isolates = list(nx.isolates(G))
+    if isolates:
+        G.remove_nodes_from(isolates)
+        
+    pos = nx.spring_layout(G, seed=seed)
+
+    # Drawing attributes
+    node_sizes = [data['avg_weight'] * 500 for _, data in G.nodes(data=True)]
+    edge_widths = [data['strength'] * 5 for _, _, data in G.edges(data=True)]
+
+    # Plot
+    plt.figure(figsize=(10, 8))
+    nx.draw_networkx_nodes(G, pos, node_size=node_sizes, alpha=0.8)
+    nx.draw_networkx_edges(G, pos, width=edge_widths, alpha=0.7)
+    nx.draw_networkx_labels(G, pos, font_size=10)
+
+    # Edge labels
+    edge_labels = {(u, v): f"{data['strength']:.2f}" for u, v, data in G.edges(data=True)}
+    nx.draw_networkx_edge_labels(
+        G, pos,
+        edge_labels=edge_labels,
+        font_color='black',
+        font_size=8,
+        label_pos=0.6,
+        bbox=dict(facecolor='white', edgecolor='none', pad=0.1)
+    )
+
+    plt.title(f"Feature appearance together rates \n Edges with frequency >= {threshold_to_keep_edge}")
+    plt.axis('off')
+    plt.show()
+
+    return G, id_map
+
+def build_feature_graph_based_on_weight_adj(A_adj: pd.DataFrame,
+                        W: pd.Series,
+                        top_k_edges: int = 10,
                         seed: int = 42):
     """
     Build and visualize a directed feature influence graph showing only the top K edges.
@@ -393,7 +466,7 @@ def inspect_neighborhoods(features, neighborhood_df, expression_df, freq_array, 
         corr_df.to_latex(f'{file_name}_{feature}_neighborhood_table.tex', float_format= "%.2f")
       print('\n')
 
-def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use_aggregated_results = False, inspect_agg_neighborhoods = False, expression_df = 'None', save_to_latex = True, save_to_csv = True, file_name = None, top_k_edges_for_graph = None):
+def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use_aggregated_results = False, inspect_agg_neighborhoods = False, expression_df = 'None', save_to_latex = True, save_to_csv = True, file_name = None, threshold_to_keep_edges = None, top_k_edges_for_graph = None):
 
   if save_to_latex or save_to_csv:
     if file_name is None:
@@ -434,15 +507,21 @@ def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use
 
   print('Unnormalized weight array: ')
   display(unnormalized_weight_array.iloc[:k])
-
-  A_adj = construct_adj_matrix_from_weight_matrix(weight_matrix, features_to_use=top_k_features)
+  '''
+  #A_adj = construct_adj_matrix_from_weight_matrix(weight_matrix, features_to_use=top_k_features)
   W = weight_array[top_k_features]
 
   if top_k_edges_for_graph is None:
     top_k_edges = 10
   else:
     top_k_edges = top_k_edges_for_graph
-  build_feature_graph(A_adj, W, top_k_edges=top_k_edges)
+  build_feature_graph_based_on_weight_adj(A_adj, W, top_k_edges=top_k_edges)
+  '''
+  A_adj = construct_adj_matrix_from_freq_matrix(freq_matrix)
+  if threshold_to_keep_edges is None:
+    threshold_to_keep_edge = 0.1
+  W = weight_array.copy()
+  build_feature_graph_based_on_freq_adj(A_adj, W, threshold_to_keep_edge=threshold_to_keep_edge)
   #convert W to df with one column 'avg. normalized weight':
   final_feat_df = pd.DataFrame(index = top_k_features)
   final_feat_df['frequency'] = freq_array[top_k_features]
