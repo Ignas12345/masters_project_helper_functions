@@ -185,7 +185,7 @@ def get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna
       for col in aggregated_weight_matrix.columns:
         if aggregated_weight_matrix.loc[idx, col] != 0:
           freq_matrix.loc[idx, col] = 1
-    print(freq_matrix.sum(axis=0))
+    #print(freq_matrix.sum(axis=0))
     return aggregated_weight_matrix, freq_matrix
   else:
     return aggregated_weight_matrix
@@ -393,7 +393,7 @@ def inspect_neighborhoods(features, neighborhood_df, expression_df, freq_array, 
         corr_df.to_latex(f'{file_name}_{feature}_neighborhood_table.tex', float_format= "%.2f")
       print('\n')
 
-def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use_aggregated_results = False, inspect_agg_neighborhoods = False, expression_df = 'None', save_to_latex = True, save_to_csv = True, file_name = None):
+def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use_aggregated_results = False, inspect_agg_neighborhoods = False, expression_df = 'None', save_to_latex = True, save_to_csv = True, file_name = None, top_k_edges_for_graph = None):
 
   if save_to_latex or save_to_csv:
     if file_name is None:
@@ -438,7 +438,11 @@ def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use
   A_adj = construct_adj_matrix_from_weight_matrix(weight_matrix, features_to_use=top_k_features)
   W = weight_array[top_k_features]
 
-  build_feature_graph(A_adj, W, top_k_edges=10)
+  if top_k_edges_for_graph is None:
+    top_k_edges = 10
+  else:
+    top_k_edges = top_k_edges_for_graph
+  build_feature_graph(A_adj, W, top_k_edges=top_k_edges)
   #convert W to df with one column 'avg. normalized weight':
   final_feat_df = pd.DataFrame(index = top_k_features)
   final_feat_df['frequency'] = freq_array[top_k_features]
