@@ -352,21 +352,28 @@ def inspect_neighborhoods(features, neighborhood_df, expression_df, freq_array, 
       neighborhood = return_neighborhood_mirnas(feature, neighborhood_df, weight_array.index)
       print(neighborhood)
 
-      corr_df = pd.DataFrame(index = ['avg. weight', 'avg. expression', 'margin', 'corr. with representative'], columns =[feature,])
+      corr_df = pd.DataFrame(index = ['frequency', 'avg. weight given app.', 'avg. expression', 'corr. with representative'], columns =[feature,])
       corr_df.loc['frequency', feature] = freq_array[feature].copy()
       try:
-        corr_df.loc['avg. weight given app.', feature] = (weight_array[feature].divide(freq_array[feature]))
+        corr_df.loc['avg. weight given app.', feature] = weight_array[feature]/freq_array[feature]
       except ZeroDivisionError:
         corr_df.loc['avg. weight given app.', feature] = 0
       corr_df.loc['avg. expression', feature] = expression_df[feature].mean()
       #corr_df.loc['margin', feature] = expression_df[feature].max() - expression_df[feature].min()
       #corr_df.loc['avg. weight diff.', feature] = weight_array[feature] - weight_array[feature]
       corr_df.loc['corr. with representative', feature] = spearmanr(expression_df[feature], expression_df[feature]).correlation
+
       for nb in neighborhood:
         if nb != feature:
-          corr_df.loc['avg. weight', nb] = weight_array.loc[nb].copy()
+
+          corr_df.loc['frequency', nb] = freq_array[nb].copy()
+          try:
+            corr_df.loc['avg. weight given app.', nb] = weight_array[nb]/freq_array[nb]
+          except ZeroDivisionError:
+            corr_df.loc['avg. weight given app.', nb] = 0
+          #corr_df.loc['avg. weight', nb] = weight_array.loc[nb].copy()
           corr_df.loc['avg. expression', nb] = expression_df[nb].mean()
-          corr_df.loc['margin', nb] = expression_df[nb].max() - expression_df[nb].min()
+          #corr_df.loc['margin', nb] = expression_df[nb].max() - expression_df[nb].min()
           #corr_df.loc['avg. weight diff.', nb] = weight_array.loc[nb] - weight_array.loc[feature]
           corr_df.loc['corr. with representative', nb] = spearmanr(expression_df[feature], expression_df[nb]).correlation
       display(corr_df)
@@ -395,11 +402,11 @@ def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use
   if use_aggregated_results:
     if mirna_cluster_df is None:
       raise ValueError('mirna_cluster_df must be provided if use_aggregated_results is True')
+    orig_weight_array = weight_array.copy()
+    orig_freq_array = freq_array.copy()
     freq_matrix = get_aggregated_by_neighbors_weight_matrix(freq_matrix, weight_array, mirna_cluster_df)
     freq_array = get_frequency_array(freq_matrix, normalize=False)
     weight_matrix = get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna_cluster_df)
-    orig_weight_array = weight_array.copy()
-    orig_freq_array = freq_array.copy()
     weight_array = get_average_weight_array(weight_matrix, normalize=True)
     unnormalized_weight_array = get_average_weight_array(weight_matrix, normalize=False)
 
