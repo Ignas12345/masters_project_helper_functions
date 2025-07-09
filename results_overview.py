@@ -121,8 +121,8 @@ def get_frequency_array(frequency_matrix, fold_indices = None, normalize = False
     frequency_array.rename('normalized frequency', inplace=True)
   else:
     frequency_array = frequency_array / len(frequency_matrix)
-    #have at most 1 as frequency
-    frequency_array = frequency_array.clip(upper=1.0)
+    #have at most 1 as frequency (was used before chaninging how freq_matrix is calculated)
+    #frequency_array = frequency_array.clip(upper=1.0)
     frequency_array.rename('frequency', inplace=True)
   return frequency_array.sort_values(ascending=False)
 
@@ -142,7 +142,7 @@ def return_neighborhood_mirnas(mirna_name, cluster_df, mirnas_to_use = None):
     neighborhood_mirnas=mirna_cluster_df[mirna_cluster_df['Cluster ID'] == clust_name].index
     return neighborhood_mirnas
 
-def get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna_cluster_df):
+def get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna_cluster_df, return_freq_matrix = False):
   used_mirnas = []
   weight_matrix = weight_matrix.copy()
   weight_array = weight_array.copy()
@@ -177,7 +177,16 @@ def get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna
           if neighborhood_mirna != representative_mirna:
             aggregated_weight_matrix[new_row_name] += weight_matrix[neighborhood_mirna]
             weight_matrix.drop(neighborhood_mirna, axis =1, inplace=True)
-        
+  
+  if return_freq_matrix:
+    #create a frequency matrix for the aggregated weight matrix
+    freq_matrix = pd.DataFrame(0, index=aggregated_weight_matrix.index, columns=aggregated_weight_matrix.columns)
+    for idx in weight_matrix.index:
+      for col in weight_matrix.columns:
+        if weight_matrix.loc[idx, col] != 0:
+          freq_matrix.loc[idx, col] = 1
+    return aggregated_weight_matrix, freq_matrix
+  
   return aggregated_weight_matrix
 
 #Functions for creating a graph and plotting the results:
@@ -404,9 +413,8 @@ def display_results(result_df, fold_indices = None, mirna_cluster_df = None, use
       raise ValueError('mirna_cluster_df must be provided if use_aggregated_results is True')
     orig_weight_array = weight_array.copy()
     orig_freq_array = freq_array.copy()
-    freq_matrix = get_aggregated_by_neighbors_weight_matrix(freq_matrix, weight_array, mirna_cluster_df)
+    weight_matrix, freq_matrix = get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna_cluster_df, return_freq_matrix=True)
     freq_array = get_frequency_array(freq_matrix, normalize=False)
-    weight_matrix = get_aggregated_by_neighbors_weight_matrix(weight_matrix, weight_array, mirna_cluster_df)
     weight_array = get_average_weight_array(weight_matrix, normalize=True)
     unnormalized_weight_array = get_average_weight_array(weight_matrix, normalize=False)
 
