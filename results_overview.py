@@ -243,32 +243,44 @@ def build_feature_graph_based_on_freq_adj(A: pd.DataFrame,
     for i, feat_i in enumerate(feats):
         for feat_j in feats[i+1:]:
             w_ij = A.loc[feat_i, feat_j]
-            if w_ij != 0 and abs(w_ij) >= threshold_to_keep_edge:
+            if w_ij != 0 and abs(w_ij):
                 u = id_map[feat_i]
                 v = id_map[feat_j]
-                G.add_edge(u, v, strength=w_ij)
+                G.add_edge(u, v, weight=w_ij)
 
     # Compute layout
-    isolates = list(nx.isolates(G))
+    
+    G_display = nx.Graph()
+    G_display.add_nodes_from(G.nodes(data=True))
+    top_edges = []
+    for u, v, data in G.edges(data=True):
+        weight = data['weight']
+        if weight >= threshold_to_keep_edge:
+            top_edges.append((u, v, weight))
+
+    for u, v, weight in top_edges:
+        G_display.add_edge(u, v, weight=weight)
+
+    isolates = list(nx.isolates(G_display))
     if isolates:
-        G.remove_nodes_from(isolates)
+        G_display.remove_nodes_from(isolates)
 
     pos = nx.spring_layout(G, seed=seed)
 
     # Drawing attributes
-    node_sizes = [data['avg_weight'] * 500 for _, data in G.nodes(data=True)]
-    edge_widths = [data['strength'] * 5 for _, _, data in G.edges(data=True)]
+    node_sizes = [data['avg_weight'] * 500 for _, data in G_display.nodes(data=True)]
+    edge_widths = [data['weight'] * 3 for _, _, data in G_display.edges(data=True)]
 
     # Plot
     plt.figure(figsize=(10, 8))
-    nx.draw_networkx_nodes(G, pos, node_size=node_sizes, alpha=0.8)
-    nx.draw_networkx_edges(G, pos, width=edge_widths, alpha=0.7)
-    nx.draw_networkx_labels(G, pos, font_size=10)
+    nx.draw_networkx_nodes(G_display, pos, node_size=node_sizes, alpha=0.8)
+    nx.draw_networkx_edges(G_display, pos, width=edge_widths, alpha=0.7)
+    nx.draw_networkx_labels(G_display, pos, font_size=10)
 
     # Edge labels
-    edge_labels = {(u, v): f"{data['strength']:.2f}" for u, v, data in G.edges(data=True)}
+    edge_labels = {(u, v): f"{data['weight']:.2f}" for u, v, data in G_display.edges(data=True)}
     nx.draw_networkx_edge_labels(
-        G, pos,
+        G_display, pos,
         edge_labels=edge_labels,
         font_color='black',
         font_size=8,
