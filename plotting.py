@@ -446,6 +446,8 @@ def plot_feature_scatter_3D(
     teratoma_col_name: str = 'total_teratoma_burden',
     refine_labels: bool = False,
     plot_ter_burden: bool = True,
+    label_color_dict: dict = None,
+    use_label_color_dict: bool = False,
     continuous_color_scale: str = 'plasma',
     width: int = 1000,
     height: int = 1000,
@@ -488,6 +490,8 @@ def plot_feature_scatter_3D(
             discrete_map = {labels[0]: 'red', labels[1]: 'blue'}
         else:
             discrete_map = {labels[0]: 'red'}
+        if label_color_dict is not None and use_label_color_dict:
+            discrete_map = label_color_dict
         if plot_ter_burden:
           if teratoma_burden_df is None:
               raise ValueError("teratoma_burden_df required when refine_labels=False")
